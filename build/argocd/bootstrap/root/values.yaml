@@ -1,0 +1,106 @@
+gitops:
+  repo: git@github.com:Crypto-Aggressor/PiKube-Kubernetes-Cluster.git
+  revision: production
+# 
+# List of application corresponding to different sync waves
+apps:
+    # CDRs App
+  - name: crds
+    namespace: default
+    path: build/argocd/bootstrap/crds
+    syncWave: 0
+    # External Secrets Operator
+  - name: external-secrets
+    namespace: external-secrets
+    path: build/argocd/system/external-secrets
+    syncWave: 1
+    # Metal LB
+  - name: metal-lb
+    namespace: metal-lb
+    path: build/argocd/system/metal-lb
+    syncWave: 2
+    # K3S system-upgrade
+  - name: system-upgrade
+    namespace: system-ugrade
+    path: build/argocd/system/system-upgrade
+    syncWave: 3
+    # Cert-Manager and Trust Manager
+  - name: cert-manager
+    namespace: cert-manager
+    path: build/argocd/system/cert-manager
+    syncWave: 4
+    # Linkerd service mesh
+  - name: linkerd
+    namespace: linkerd
+    path: build/argocd/system/linkerd
+    syncWave: 5
+    # Traefik Ingress Controller
+    # - name: traefik
+    #   namespace: traefik
+    #   path: argocd/system/traefik
+    #   syncWave: 6
+    #   helm:
+    #     # skip installation traefik CDRs
+    #     skipCrds: true
+  - name: nginx
+    namespace: nginx
+    path: build/argocd/system/nginx
+    syncWave: 6
+    # CSI External Snapshotter
+  - name: csi-external-snapshotter
+    namespace: kube-system
+    path: build/argocd/system/csi-external-snapshotter
+    syncWave: 7
+    # Longhorn Distributed Block Storage
+  - name: longhorn
+    namespace: longhorn-system
+    path: build/argocd/system/longhorn-system
+    syncWave: 8
+    # Minio Object Storage
+  - name: minio
+    namespace: minio
+    path: build/argocd/system/minio
+    syncWave: 9
+    # Velero Backup
+  - name: velero
+    namespace: velero
+    path: build/argocd/system/velero
+    syncWave: 10
+    # Logging: Loki and EFK stack
+  - name: logging
+    namespace: logging
+    path: build/argocd/system/logging
+    syncWave: 11
+    # Kube-prometheus-stack
+  - name: monitoring
+    namespace: monitoring
+    path: build/argocd/system/monitoring
+    syncWave: 12
+    helm:
+      # skip installation kube-prometheus-stack CDRs
+      skipCrds: true
+    # Linkerd-viz
+  - name: linkerd-viz
+    namespace: linkerd-viz
+    path: build/argocd/system/linkerd-viz
+    syncWave: 13
+    # Tracing: Tempo
+  - name: tracing
+    namespace: tracing
+    path: build/argocd/system/tracing
+    syncWave: 14
+    # Linkerd-jaeger
+  - name: linkerd-jaeger
+    namespace: linkerd-jaeger
+    path: build/argocd/system/linkerd-jaeger
+    syncWave: 15
+    # Argo CD App
+  - name: argocd
+    namespace: argocd
+    path: build/argocd/bootstrap/argocd
+    syncWave: 16
+    # Kafka App
+  - name: kafka
+    namespace: kafka
+    path: build/argocd/system/kafka
+    syncWave: 17

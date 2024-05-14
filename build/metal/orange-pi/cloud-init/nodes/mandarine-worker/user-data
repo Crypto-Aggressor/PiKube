@@ -1,0 +1,26 @@
+#cloud-config
+
+# Set TimeZone and Locale for UK
+timezone: Europe/London
+locale: en_GB.UTF-8
+
+# Hostname
+hostname: mandarine-worker
+
+# cloud-init not managing hosts file. only hostname is added
+manage_etc_hosts: localhost
+
+users:
+  # not using default ubuntu user
+  - name: pi
+    primary_group: users
+    groups: [adm, admin]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCvE8ju9IxfwyEj0NSJhqrI2sob6QfpEuCAJurNc2XA54/pldF3CpvJlijTOPk2Q3m115DIE/MIGbltki8z59JdMmd/k+kxoXKfF/oZJmolyr6A6sxmtOyi+2Zcf+T/XPg6OEvYfIV3dK5lsIEUl4fDYRIGKcnzVplfJ/lG7N6IV55zvVzFTaehVA1HasLpJ2wDUUQVGMSnWFf16N8r0CscZebxZAzZoHB1SLUEZcQ3EkcM0+DMRXb9jtvLnnLJ6QNLnYOwS4gQ3Myrh2I1IyhnZIA2UQyYyqL1Z3iFfM27NhRFS8WvltDF1a58uXlN9p8bp6/dZRJnzMhNXrAMkwVixGx+nfmO9RNWHDQU7kUJEqmzXuyf6TjGtl1Csk+YvYpe+m1p4plyXDed5O3NtdHQ0O5BbXii5bLceTY2KucI15Mf4ClWihdVLmipRgwzNSmlZMoI8TRspOaTTI8KZ/VKvmbrKSBaNPKxTkP9+0J3fQPk10Qwc6xOJx80/ldOn30= amine@Who-Am-I
+     
+## Reboot to enable Wifi configuration (more details in network-config file)
+power_state:
+  mode: reboot

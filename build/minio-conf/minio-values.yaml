@@ -1,0 +1,108 @@
+existingSecret: minio-secret
+
+drivesPerNode: 1
+replicas: 3
+pools: 1
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+          - arm64
+
+persistence:
+  enabled: true
+  storageClass: "longhorn"
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+resources:
+  requests:
+    memory: 1Gi
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    includeNode: true
+
+buckets:
+  - name: k3s-loki
+    policy: none
+  - name: k3s-tempo
+    policy: none
+
+policies:
+  - name: loki
+    statements:
+      - resources:
+          - 'arn:aws:s3:::k3s-loki'
+          - 'arn:aws:s3:::k3s-loki/*'
+        actions:
+          - "s3:DeleteObject"
+          - "s3:GetObject"
+          - "s3:ListBucket"
+          - "s3:PutObject"
+  - name: tempo
+    statements:
+      - resources:
+          - 'arn:aws:s3:::k3s-tempo'
+          - 'arn:aws:s3:::k3s-tempo/*'
+        actions:
+          - "s3:DeleteObject"
+          - "s3:GetObject"
+          - "s3:ListBucket"
+          - "s3:PutObject"
+          - "s3:GetObjectTagging"
+          - "s3:PutObjectTagging"
+
+users:
+  - accessKey: loki
+    existingSecret: minio-secret
+    existingSecretKey: lokiPassword
+    policy: loki
+  - accessKey: tempo
+    existingSecret: minio-secret
+    existingSecretKey: tempoPassword
+    policy: tempo
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - s3.picluster.quantfinancehub.com
+  tls:
+    - secretName: minio-tls
+      hosts:
+        - s3.picluster.quantfinancehub.com
+  path: /
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    # Enable cert-manager to create automatically the SSL certificate and store in Secret
+    # Possible Cluster-Issuer values:
+    #   * 'letsencrypt-issuer' (valid TLS certificate using Cloudflare API)
+    #   * 'picluster-ca-issuer' (CA-signed certificate, not valid)
+    cert-manager.io/common-name: s3.picluster.quantfinancehub.com
+
+consoleIngress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - minio.picluster.quantfinancehub.com
+  tls:
+    - secretName: minio-console-tls
+      hosts:
+        - minio.picluster.quantfinancehub.com
+  path: /
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    # Enable cert-manager to create automatically the SSL certificate and store in Secret
+    # Possible Cluster-Issuer values:
+    #   * 'letsencrypt-issuer' (valid TLS certificate using Cloudflare API)
+    #   * 'picluster-ca-issuer' (CA-signed certificate, not valid)
+    cert-manager.io/common-name: minio.picluster.quantfinancehub.com

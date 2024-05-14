@@ -1,0 +1,63 @@
+# broadcast and multicast
+define badcast_addr = { 255.255.255.255, 224.0.0.1, 224.0.0.251 } # Broadcast and Multicast addresses (IPv4)
+define ip6_badcast_addr = { ff02::16 } # Multicast address (IPv6)
+
+# in_tcp_accept
+define in_tcp_accept = {
+    ssh,           # SSH protocol
+    https,         # HTTPS protocol
+    http,          # HTTP protocol
+    9100,          # Node exporter (Prometheus)
+    8200, 8201,    # Vault ports
+    6443,          # Kubernetes API server
+    iscsi-target   # iSCSI target port
+}
+
+# in_udp_accept
+define in_udp_accept = {
+    snmp,          # SNMP protocol
+    domain,        # DNS protocol
+    ntp,           # NTP protocol
+    bootps,        # BOOTP/DHCP server
+    69             # TFTP protocol
+}
+
+# out_tcp_accept
+define out_tcp_accept = {
+    http,          # HTTP protocol
+    https,         # HTTPS protocol
+    ssh            # SSH protocol
+}
+
+# out_udp_accept
+define out_udp_accept = {
+    domain,        # DNS protocol
+    bootps,        # BOOTP/DHCP server
+    ntp            # NTP protocol
+}
+
+# lan_interface
+define lan_interface = eth0      # Internal LAN interface
+
+# wan_interface
+define wan_interface = wlan0     # External WAN interface
+
+# lan_network
+define lan_network = 10.0.0.0/24 # LAN IP range
+
+# forward_tcp_accept
+define forward_tcp_accept = {
+    http,          # HTTP protocol
+    https,         # HTTPS protocol
+    ssh,           # SSH protocol
+    9091           # MinIO browser
+}
+
+# forward_udp_accept
+define forward_udp_accept = {
+    domain,        # DNS protocol
+    ntp            # NTP protocol
+}
+
+# Vault listening ports
+define vault_ports = { 8200, 8201 }

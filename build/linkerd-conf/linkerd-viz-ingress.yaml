@@ -1,0 +1,42 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: linkerd-viz-ingress
+  namespace: linkerd-viz
+  annotations:
+    # Enable basic authentication for the ingress. This requires users to authenticate using credentials stored in a Kubernetes secret.
+    nginx.ingress.kubernetes.io/auth-type: basic
+    # The name of the Kubernetes secret that contains the authentication credentials. The secret should be defined in the same namespace as the Nginx ingress controller.
+    nginx.ingress.kubernetes.io/auth-secret: nginx/basic-auth-secret
+    # Instructs the Nginx ingress controller to treat the backend service as an upstream entity. This ensures that the original client's IP address is preserved.
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    # Sets the virtual host in the upstream request to the Linkerd Viz service. This is necessary for DNS rebind protection and to ensure requests are properly routed within the cluster.
+    nginx.ingress.kubernetes.io/upstream-vhost: $service_name.$namespace.svc.cluster.local:8084
+    # Additional Nginx configuration to ensure compatibility with Linkerd Viz's security mechanisms. This includes setting the Origin header to an empty string and hiding specific headers.
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Origin "";
+      proxy_hide_header l5d-remote-ip;
+      proxy_hide_header l5d-server-id;
+    # Annotations for cert-manager to automatically issue and manage an SSL certificate for the Ingress, storing it in a Kubernetes secret.
+    cert-manager.io/cluster-issuer: picluster-ca-issuer
+    # The common name to be used for the generated SSL certificate, typically matching the domain name.
+    cert-manager.io/common-name: linkerd.picluster.quantfinancehub.com
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - linkerd.picluster.quantfinancehub.com
+      # The name of the Kubernetes secret where the SSL certificate will be stored.
+      secretName: linkerd-viz-tls
+  rules:
+    - host: linkerd.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8084  

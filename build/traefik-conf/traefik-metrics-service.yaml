@@ -1,0 +1,24 @@
+# Define the API version and kind of resource
+apiVersion: v1
+kind: Service
+
+# Metadata for the service
+metadata:
+  name: traefik-metrics                # Name of the service
+  namespace: traefik                   # Namespace where the service will be deployed
+  labels:                              # Labels for identifying and organizing the resource
+    app.kubernetes.io/instance: traefik
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: traefik-metrics
+
+# Specification of the service
+spec:
+  type: ClusterIP                      # Type of service, ClusterIP means internal to cluster
+  ports:                               # Port configuration
+    - name: metrics                    # Name for the port, for identification
+      port: 9100                       # The port number through which the service is exposed
+      targetPort: metrics              # The target port on the pods where traffic is sent
+      protocol: TCP                    # Network protocol used (TCP)
+  selector:                            # Selector to target the pods this service will route to
+    app.kubernetes.io/instance: traefik-traefik
+    app.kubernetes.io/name: traefik

@@ -1,0 +1,45 @@
+#cloud-config
+timezone: Europe/London
+locale: en_GB.UTF-8
+hostname: gateway
+manage_etc_hosts: localhost
+users:
+  - name: pi
+    primary_group: users
+    groups: [adm, admin]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCvE8ju9IxfwyEj0NSJhqrI2sob6QfpEuCAJurNc2XA54/pldF3CpvJlijTOPk2Q3m115DIE/MIGbltki8z59JdMmd/k+kxoXKfF/oZJmolyr6A6sxmtOyi+2Zcf+T/XPg6OEvYfIV3dK5lsIEUl4fDYRIGKcnzVplfJ/lG7N6IV55zvVzFTaehVA1HasLpJ2wDUUQVGMSnWFf16N8r0CscZebxZAzZoHB1SLUEZcQ3EkcM0+DMRXb9jtvLnnLJ6QNLnYOwS4gQ3Myrh2I1IyhnZIA2UQyYyqL1Z3iFfM27NhRFS8WvltDF1a58uXlN9p8bp6/dZRJnzMhNXrAMkwVixGx+nfmO9RNWHDQU7kUJEqmzXuyf6TjGtl1Csk+YvYpe+m1p4plyXDed5O3NtdHQ0O5BbXii5bLceTY2KucI15Mf4ClWihdVLmipRgwzNSmlZMoI8TRspOaTTI8KZ/VKvmbrKSBaNPKxTkP9+0J3fQPk10Qwc6xOJx80/ldOn30= amine@Who-Am-I
+power_state:
+  mode: reboot
+# write_files:
+#   - path: /etc/nftables/file1.conf
+#     content: |
+#       # Contents of your nftables config file 1
+#       # ...
+#   - path: /etc/nftables/file2.conf
+#     content: |
+#       # Contents of your nftables config file 2
+#       # ...
+#   - path: /etc/nftables/file3.conf
+#     content: |
+#       # Contents of your nftables config file 3
+#       # ...
+runcmd:
+  # - /bin/bash -c "while ! wget -q --spider https://www.google.com/; do sleep 1; done"
+  # - [wget, "--retry-connrefused", "--waitretry=1", "--read-timeout=20", "--timeout=15", "-t", "5", "https://www.google.com/"]
+  # - /bin/bash -c "wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 5 https://www.google.com/ > /var/log/connection_message.log 2>&1"
+  - sudo apt update && sudo apt full-upgrade -y > /var/log/apt_upgrade.log 2>&1
+  - sudo shutdown -r now
+  - sudo snap list > /var/log/snap_list.log 2>&1
+  - sudo snap remove lxd && sudo snap remove core18 && sudo snap remove snapd > /var/log/snap_remove.log 2>&1
+  - sudo apt purge snapd > /var/log/snap_purge.log 2>&1
+  - sudo apt autoremove > /var/log/apt_autoremove.log 2>&1
+  # - sudo apt install libraspberrypi-bin > /var/log/apt_install.log 2>&1
+  - sudo apt install net-tools > /var/log/net_tools_install.log 2>&1
+  - sudo apt install arp-scan > /var/log/arp_scan_install.log 2>&1
+  - sudo apt install inetutils-traceroute > /var/log/traceroute_install.log 2>&1
+  - sudo apt install nftables > /var/log/nftables.log 2>&1
+  - systemctl restart nftables > /var/log/nftables_restart.log 2>&1

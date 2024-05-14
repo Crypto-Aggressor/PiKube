@@ -1,0 +1,98 @@
+# package-manager.yaml
+---
+- name: Install Packages with Specific Exclusions
+  hosts: gateway, picluster
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Define package exclusions for orangepi nodes
+      set_fact:
+        exclusions: ['libraspberrypi-bin', 'linux-modules-extra-raspi']
+      when: inventory_hostname in ['node6', 'node7']
+
+    - name: Define package exclusions for the rest of picluster nodes
+      set_fact:
+        exclusions: ['nftables', 'dnsmasq', 'haproxy']
+      when: "'picluster' in group_names"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages with conditional exclusions
+      apt:
+        name: "{{ item.name }}"
+        state: present
+      loop: "{{ packages_to_install }}"
+      when: 
+        - item.name not in exclusions
+        - item.name not in ['yq', 'hvac', 'kubernetes']  # Exclude pip packages from APT installations
+      vars:
+        packages_to_install:
+          - { name: "certbot", description: "A tool to automatically receive and install SSL/TLS certificates from Let's Encrypt." }
+          - { name: "python3-certbot-dns-cloudflare", description: "Certbot plugin for DNS authentication with Cloudflare." }
+          - { name: "libraspberrypi-bin", description: "Raspberry Pi-specific utilities and tools." }
+          - { name: "net-tools", description: "Essential network diagnostic utilities." }
+          - { name: "arp-scan", description: "Detect and identify devices on the network." }
+          - { name: "inetutils-traceroute", description: "Network path analysis using traceroute." }
+          - { name: "nftables", description: "Modern firewall management with nftables." }
+          - { name: "linux-modules-extra-raspi", description: "Additional kernel modules for Raspberry Pi hardware support." }
+          - { name: "dnsmasq", description: "Lightweight DNS, DHCP, and TFTP server." }
+          - { name: "iptables-persistent", description: "Persistent IP packet filter rules for IPv4 and IPv6." }
+          - { name: "netfilter-persistent", description: "Framework for saving and restoring netfilter rules." }
+          - { name: "haproxy", description: "HAProxy load balancer." }
+          - { name: "fake-hwclock", description: "Fake hardware clock." }
+          - { name: "bridge-utils", description: "Utilities for configuring the Linux Ethernet bridge." }
+          - { name: "chrony", description: "NTP server and client." }
+          - { name: "apache2-utils", description: "Utility programs for managing the Apache HTTP Server." }
+          - { name: "jq", description: "Lightweight and flexible command-line JSON processor." }
+          - { name: "yq", description: "A portable command-line YAML, JSON and XML processor." }
+          - { name: "python3-pip", description: "Python package installer, enabling installation of additional software written in Python." }
+          - { name: "python3-setuptools", description: "A Python utility that aids in the packaging and distribution of Python packages." }
+
+    # Directly checking for pip before installation
+    - name: Check if pip is installed
+      command: pip --version
+      register: pip_check
+      ignore_errors: true
+      changed_when: false
+
+    # - name: Create a virtual environment for PiKube
+    #   ansible.builtin.command:
+    #     cmd: python3 -m venv /home/pi/py_envs/pikube_venv
+    #   args:
+    #     creates: /home/pi/py_envs/pikube_venv
+
+    # - name: Install Python packages within the virtual environment
+    #   pip:
+    #     name: "{{ item.name }}"
+    #     state: present
+    #     virtualenv: /home/pi/py_envs/pikube_venv
+    #   loop: 
+    #     - { name: "yq", description: "A portable command-line YAML, JSON and XML processor." }
+    #     - { name: "hvac", description: "HashiCorp Vault client for Python." }
+    #     - { name: "kubernetes", description: "Kubernetes client for Python." }
+
+    - name: Install Python packages using pip
+      pip:
+        name: "{{ item.name }}"
+        state: present
+      loop: 
+        - { name: "yq", description: "A portable command-line YAML, JSON and XML processor." }
+        - { name: "hvac", description: "HashiCorp Vault client for Python." }
+        - { name: "kubernetes", description: "Kubernetes client for Python." }
+      when: pip_check.rc == 0
+
+    - name: Check if reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot the machine if needed
+      reboot:
+        msg: "Rebooting due to package updates"
+      when: 
+        - reboot_required.stat.exists
+        - "'orangepi' not in group_names"

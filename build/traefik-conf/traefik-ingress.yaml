@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: traefik-ingress
+  namespace: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-basic-auth@kubernetescrd,traefik-l5d-header-middleware@kubernetescrd
+    cert-manager.io/cluster-issuer: picluster-ca-issuer
+    cert-manager.io/common-name: traefik.picluster.quantfinancehub.com
+spec:
+  tls:
+    - hosts:
+        - traefik.picluster.quantfinancehub.com
+      secretName: traefik-tls
+  rules:
+    - host: traefik.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: traefik-dashboard
+                port:
+                  number: 9000

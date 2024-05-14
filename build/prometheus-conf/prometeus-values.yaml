@@ -1,0 +1,113 @@
+# Prometheus Operator configuration
+prometheusOperator:
+  serviceMonitor:
+    relabelings:
+      - sourceLabels: [__address__]
+        action: replace
+        targetLabel: job
+        replacement: prometheus-operator
+  kubeletService:
+    enabled: false
+
+# Alertmanager configuration
+alertmanager:
+  alertmanagerSpec:
+    externalUrl: http://monitor.picluster.quantfinancehub.com/alertmanager/
+    routePrefix: /
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+  serviceMonitor:
+    relabelings:
+      - sourceLabels: [__address__]
+        action: replace
+        targetLabel: job
+        replacement: alertmanager
+
+# Prometheus configuration
+prometheus:
+  prometheusSpec:
+    externalUrl: http://monitoring.picluster.quantfinancehub.com/prometheus/
+    routePrefix: /
+    resources:
+      requests:
+        memory: 1Gi
+      limits:
+        memory: 1Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+    retention: 7d
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+  serviceMonitor:
+    relabelings:
+      - sourceLabels: [__address__]
+        action: replace
+        targetLabel: job
+        replacement: prometheus
+
+# Grafana configuration
+grafana:
+  grafana.ini:
+    server:
+      domain: monitoring.picluster.quantfinancehub.com
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+      serve_from_sub_path: true
+  adminPassword: "admin_password"
+  plugins:
+    - grafana-piechart-panel
+  serviceMonitor:
+    labels:
+      release: kube-prometheus-stack
+    relabelings:
+      - sourceLabels: [__address__]
+        action: replace
+        targetLabel: job
+        replacement: grafana
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-gateway.logging.svc.cluster.local
+  sidecar:
+    dashboards:
+      searchNamespace: ALL
+
+# Disabling default Kubernetes service monitoring
+kubelet: { enabled: false }
+kubeApiServer: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }
+
+# Disabling default K8S Prometheus Rules
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    k8s: false
+    kubeApiserverAvailability: false
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+    kubeControllerManager: false
+    kubelet: false
+    kubeProxy: false
+    kubernetesApps: false
+    kubernetesResources: false
+    kubernetesStorage: false
+    kubernetesSystem: false
+    kubeScheduler: false

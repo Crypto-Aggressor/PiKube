@@ -1,0 +1,117 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: linkerd # Identifies the app as Linkerd for labeling and filtering purposes.
+    release: kube-prometheus-stack # Associates this monitor with a specific Prometheus operator release.
+  name: linkerd-controller # Name of the PodMonitor for the Linkerd controller component.
+  namespace: monitoring # Namespace where the PodMonitor resource will be created.
+spec:
+  namespaceSelector:
+    matchNames:
+      - linkerd-viz # Targets the linkerd-viz namespace for monitoring.
+      - linkerd # Also targets the linkerd namespace.
+  selector:
+    matchLabels: {} # An empty selector that matches all pods within the specified namespaces.
+  podMetricsEndpoints:
+    - relabelings:
+      - sourceLabels:
+          - __meta_kubernetes_pod_container_port_name
+        action: keep
+        regex: admin-http # Only keeps metrics from containers exposing an 'admin-http' port, common for Linkerd components.
+      - sourceLabels:
+          - __meta_kubernetes_pod_container_name
+        action: replace
+        targetLabel: component # Renames the container name label to 'component' for clarity.
+      - sourceLabels:
+          - __address__
+        action: replace
+        targetLabel: job
+        replacement: linkerd-controller # Sets the job label to 'linkerd-controller', identifying the source of the metrics.
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: linkerd
+    release: kube-prometheus-stack
+  name: linkerd-service-mirror # Specific monitor for the Linkerd service mirror component.
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    any: true # Indicates that this monitor targets pods across all namespaces.
+  selector:
+    matchLabels: {} # Matches all pods, similar to the previous monitor.
+  podMetricsEndpoints:
+    - relabelings:
+      - sourceLabels:
+          - __meta_kubernetes_pod_label_linkerd_io_control_plane_component
+          - __meta_kubernetes_pod_container_port_name
+        action: keep
+        regex: linkerd-service-mirror;admin-http$ # Specifically targets the 'linkerd-service-mirror' component exposing 'admin-http'.
+      - sourceLabels:
+          - __meta_kubernetes_pod_container_name
+        action: replace
+        targetLabel: component
+      - source_labels:
+          - __address__
+        action: replace
+        targetLabel: job
+        replacement: linkerd-service-mirror # Identifies the source of metrics as the Linkerd service mirror.
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: linkerd
+    release: kube-prometheus-stack
+  name: linkerd-proxy # Monitor for the Linkerd proxy sidecars.
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    any: true # Targets all namespaces, as Linkerd proxies are deployed alongside applications in various namespaces.
+  selector:
+    matchLabels: {} # Matches all pods, aiming to discover all Linkerd proxies.
+  podMetricsEndpoints:
+    - relabelings:
+      - sourceLabels:
+          - __meta_kubernetes_pod_container_name
+          - __meta_kubernetes_pod_container_port_name
+          - __meta_kubernetes_pod_label_linkerd_io_control_plane_ns
+        action: keep
+        regex: ^linkerd-proxy;linkerd-admin;linkerd$ # Filters for the Linkerd proxy containers specifically.
+      - sourceLabels: [__meta_kubernetes_namespace]
+        action: replace
+        targetLabel: namespace # Sets the namespace label for better identification.
+      - sourceLabels: [__meta_kubernetes_pod_name]
+        action: replace
+        targetLabel: pod # Sets the pod label.
+      - sourceLabels: [__meta_kubernetes_pod_label_linkerd_io_proxy_job]
+        action: replace
+        targetLabel: k8s_job # Optional labeling for job identification, can be customized or removed based on needs.
+      - action: labeldrop
+        regex: __meta_kubernetes_pod_label_linkerd_io_proxy_job # Drops temporary labels to clean up.
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_linkerd_io_proxy_(.+) # Maps Linkerd proxy labels for Prometheus.
+      - action: labeldrop
+        regex: __meta_kubernetes_pod_label_linkerd_io_proxy_(.+)
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_linkerd_io_(.+)
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+        replacement: __tmp_pod_label_$1 # Temporary label mapping for further processing.
+      - action: labelmap
+        regex: __tmp_pod_label_linkerd_io_(.+)
+        replacement:  __tmp_pod_label_$1
+      - action: labeldrop
+        regex: __tmp_pod_label_linkerd_io_(.+)
+      - action: labelmap
+        regex: __tmp_pod_label_(.+)
+      - sourceLabels:
+          - __address__
+        action: replace
+        targetLabel: job
+        replacement: linkerd-proxy # Finalizes the job label as 'linkerd-proxy' for the metrics collected from Linkerd proxies.

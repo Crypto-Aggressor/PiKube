@@ -1,0 +1,14 @@
+# Cloud-init net configuration 
+
+version: 2
+ethernets:
+  eth0:
+    dhcp4: true
+wifis:
+  wlan0:
+    dhcp4: true
+    dhcp6: true
+    optional: true
+    access-points:
+      "Hbibounette_AlmondSkewer_5G":
+        password: "#Poonami05112020@"

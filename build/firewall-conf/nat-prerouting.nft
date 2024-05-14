@@ -1,0 +1,10 @@
+chain prerouting {
+    # Policy: Process Network Address Translation (NAT) before routing decisions have been made.
+    # This is typically used to translate the destination addresses of packets that are entering the network.
+    # This is commonly used in port forwarding scenarios where you want to direct traffic
+    # coming into a public IP to a private IP inside the network.
+    type nat hook prerouting priority 0;
+
+    # Log NAT prerouting decisions
+    log prefix "[NAT PREROUTING]:" limit rate 5/minute
+}

@@ -1,0 +1,80 @@
+# k3s-worker-nodes-configuration.yaml
+---
+# This playbook prepares and joins K3s worker nodes to the cluster. It ensures worker nodes
+# are correctly configured to communicate with the master nodes, using the cluster token for
+# authentication and applying any necessary runtime configurations specific to worker nodes.
+
+# Setup tasks for K3s on worker nodes
+- name: Setup K3s Worker Nodes
+  hosts: k3s_worker
+  become: true
+  tasks:
+    # Creates the configuration directory for K3s
+    - name: Initialize K3s configuration directory
+      file:
+        path: /etc/rancher/k3s
+        state: directory
+
+    # Sets up a shared cluster token for K3s nodes
+    - name: Setup shared cluster token for K3s nodes
+      copy:
+        content: "secret1"
+        dest: /etc/rancher/k3s/cluster-token
+        mode: '0600'
+
+    # Configures the kubelet based on Kubernetes' requirements
+    - name: Setup Kubelet Configuration for K3s
+      copy:
+        content: |
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          shutdownGracePeriod: 30s
+          shutdownGracePeriodCriticalPods: 10s
+        dest: /etc/rancher/k3s/kubelet.config
+        mode: '0644'
+
+    # Applies the main configuration for K3s including disabling unnecessary services
+    - name: Apply K3s configuration settings
+      copy:
+        content: |
+          token-file: /etc/rancher/k3s/cluster-token
+          node-label:
+            - 'node_type=worker'
+          kubelet-arg:
+            - 'config=/etc/rancher/k3s/kubelet.config'
+          kube-proxy-arg:
+            - 'metrics-bind-address=0.0.0.0'
+        dest: /etc/rancher/k3s/config.yaml
+        mode: '0644'
+
+# Deploys K3s on worker nodes by joining them to the cluster
+- name: Deploy Worker Nodes with K3s
+  hosts: k3s_worker
+  become: true
+  tasks:
+    - name: Ensure connectivity to the primary master node before proceeding
+      wait_for:
+        host: "{{ hostvars['node1'].ansible_host }}"
+        port: 6443
+        state: started
+        timeout: 300
+      when: inventory_hostname != 'node1'
+
+    - name: Install K3s on worker nodes by joining them to the cluster
+      shell: curl -sfL https://get.k3s.io | sh -s - agent --server https://gateway.picluster.quantfinancehub.com:6443
+      register: k3s_installation
+      until: k3s_installation.rc == 0
+      retries: 5
+      delay: 60
+      # when: inventory_hostname != 'node1'
+      ignore_errors: true
+      args:
+        creates: /var/lib/rancher/k3s/server/node-token
+
+- name: Label K3s worker nodes as worker
+  hosts: k3s_master
+  tasks:
+    - name: Label worker nodes
+      command:
+        cmd: kubectl label node {{ hostvars[item].hostname }} node-role.kubernetes.io/worker=worker --overwrite
+      with_items: "{{ groups['k3s_worker'] }}"

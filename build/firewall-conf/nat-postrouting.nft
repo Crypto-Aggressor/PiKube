@@ -1,0 +1,16 @@
+chain postrouting {
+    # Policy: Process Network Address Translation (NAT) after routing decisions have been made.
+    # This is typically used to translate the source addresses of packets that are leaving the network.
+    type nat hook postrouting priority 100;
+
+    # Masquerade: This is a form of Source NAT (SNAT).
+    # When a packet leaves the network, its source address is replaced by the address of the machine
+    # doing the masquerading (in this case, the gateway).
+    # The masquerade target is used for dynamically-assigned IPs where the IP address can change at any time.
+    # It will use the current IP address of the outgoing interface.
+    # This ensures that replies can return to the machine that sent them, even if the network's public IP changes.
+    ip saddr $lan_network oifname $wan_interface masquerade
+
+    # Log NAT postrouting decisions
+    log prefix "[NAT POSTROUTING]:" limit rate 5/minute
+}

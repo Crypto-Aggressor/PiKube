@@ -1,0 +1,48 @@
+# traefik-values.yaml: Configuration for Traefik with Prometheus metrics and access logs
+
+# Access log settings
+logs:
+  access:
+    enabled: true  # Enable access logging
+    format: json   # Set log format to JSON
+
+# Additional arguments for Traefik configuration
+additionalArguments:
+  - "--metrics.prometheus=true"                      # Enable Prometheus metrics
+  - "--accesslog"                                    # Enable access logging
+  - "--accesslog.format=json"                        # Set access log format to JSON
+  - "--accesslog.filepath=/data/access.log"          # Specify file path for access logs
+  - "--api.dashboard=true"                           # Enable the Traefik Dashboard
+  - "--api.insecure=true"                            # Optional: Expose the dashboard without TLS for testing
+
+# Deployment configuration
+deployment:
+  # Define additional containers within the Traefik pod
+  additionalContainers:
+    - name: stream-accesslog                         # Name of the sidecar container
+      image: busybox                                 # Image used for the sidecar (busybox)
+      args:
+        - "/bin/sh"                                  # Shell to execute the following command
+        - "-c"
+        - "tail -n+1 -F /data/access.log"            # Command to tail the access logs
+      imagePullPolicy: Always                        # Image pull policy
+      resources: {}                                  # Resource requests and limits (empty for default)
+      terminationMessagePath: /dev/termination-log   # Path for termination log
+      terminationMessagePolicy: File                 # Policy for termination message
+      volumeMounts:
+        - mountPath: /data                           # Mount path for data
+          name: data                                 # Volume name
+
+# Service configuration
+service:
+  spec:
+    loadBalancerIP: 10.0.0.111                       # Set external IP for the load balancer
+
+# Provider configuration
+providers:
+  kubernetesCRD:
+    enabled: true                                    # Enable Kubernetes CRD
+    allowCrossNamespace: true                        # Allow cross-namespace references
+  kubernetesIngress:
+    publishedService:
+      enabled: true                                  # Enable publishing of services

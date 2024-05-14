@@ -1,0 +1,146 @@
+# k3s-master-bootstrap.yaml
+---
+- name: Bootstrap Cluster
+  hosts: gateway
+  gather_facts: false
+
+  collections:
+    - kubernetes.core
+
+  environment:
+    # The location of the kubeconfig file on the master.
+    K8S_AUTH_KUBECONFIG: /home/pi/.kube/config.yaml
+
+  pre_tasks:
+    # Install Python PIP and jq utility packages
+    - name: Ensure required packages are installed.
+      package:
+        name:
+          - python3-pip
+          - python3-setuptools
+          - jq
+        state: present
+      become: true
+    # Install kubernetes python packages (Ansible kubernetes collection dependency)
+    - name: Ensure kubernetes Python library is installed.
+      pip:
+        name: kubernetes
+        state: present
+      become: true
+    # Install Hashicorp python packages (Ansible hashi module dependency)
+    - name: Ensure hashicorp vault python library is installed.
+      pip:
+        name: hvac
+        state: present
+      become: true
+
+    # Install Helm diff plugin to have a better idempotence check (helm need to be installed)
+    - name: Intall Helm Plugin
+      kubernetes.core.helm_plugin:
+        plugin_path: "https://github.com/databus23/helm-diff"
+        state: present
+
+    - name: Include required variables
+      include_vars: "{{ item }}"
+      loop:
+        - "vars/vault.yaml"
+        - "vars/pikube-cluster.yaml"
+
+  tasks:
+    - name: Create namespaces.
+      kubernetes.core.k8s:
+        name: "{{ item }}"
+        api_version: v1
+        kind: Namespace
+        state: present
+      with_items:
+        - "argocd"
+        - "vault"
+
+    - name: Configure Vault integration
+      include_tasks: tasks/configure-vault-integration.yaml
+
+    - name: Copy Argo CD chart and CRDs
+      ansible.builtin.copy:
+        src: "../argocd/{{ item }}"
+        dest: /tmp/charts
+      with_items:
+        - "bootstrap/crds"
+        - "bootstrap/argocd"
+
+    # - name: List CRD files
+    #   ansible.builtin.shell:
+    #     cmd: ls -l /tmp/charts/crds
+    #   register: ls_output
+    # - debug:
+    #     var: ls_output.stdout_lines
+
+    - name: Install CRDs
+      ansible.builtin.shell: |
+        set -o pipefail
+        kubectl --kubeconfig /home/pi/.kube/config.yaml kustomize /tmp/charts/crds --enable-helm \
+        | kubectl --kubeconfig /home/pi/.kube/config.yaml apply --server-side -f -
+      args:
+        executable: /bin/bash
+
+    - name: Update Argo CD Helm dependency
+      ansible.builtin.command:
+        cmd: "helm dependency update /tmp/charts/argocd"
+
+    - name: Deploy Argo CD Helm chart.
+      shell: |
+        set -o pipefail
+        helm template \
+        --dependency-update \
+        --include-crds \
+        --namespace argocd \
+        argocd /tmp/charts/argocd \
+        | kubectl --kubeconfig /home/pi/.kube/config.yaml apply -n argocd -f -
+      args:
+        executable: /bin/bash
+
+    - name: Wait for CRDs to be ready
+      command:
+        cmd: "kubectl --kubeconfig /home/pi/.kube/config.yaml wait --for condition=Established crd/applications.argoproj.io crd/applicationsets.argoproj.io --timeout=600s"
+      changed_when: false
+
+    - name: Check file content
+      command: cat /home/pi/.ssh/github
+      register: ssh_key
+      ignore_errors: yes
+
+    - name: Create SSH key secret for Argo CD
+      become: yes
+      kubernetes.core.k8s:
+        state: present
+        namespace: argocd
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: argocd-ssh-secret
+          type: Opaque
+          data:
+            sshPrivateKey: "{{ ssh_key.stdout | b64encode }}"
+      # no_log: true
+
+    # - name: Deploy repository configuration for Argo CD
+    #   kubernetes.core.k8s:
+    #     state: present
+    #     namespace: argocd
+    #     definition: "{{ lookup('template', 'templates/argocd-repo-config.yml.j2') }}"
+
+    - name: Deploy root application
+      kubernetes.core.k8s:
+        definition: "{{ lookup('template', 'templates/' + item ) }}"
+        state: present
+      with_items:
+        - argocd_root_app.yml.j2
+
+    - name: Recursively remove tmp directory
+      ansible.builtin.file:
+        path: /tmp/charts
+        state: absent
+
+    # - name: Install cli utils.
+    #   include_tasks: tasks/install-cli-utils.yaml

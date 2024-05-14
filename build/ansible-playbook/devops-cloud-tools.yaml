@@ -1,0 +1,114 @@
+---
+- name: Install DevOps Applications for cloud management
+  hosts: gateway
+  become: yes
+
+  tasks:
+    # Tasks for checking and installing k9s
+    - name: Check if k9s is installed
+      command: k9s version
+      register: k9s_installed
+      failed_when: false
+      changed_when: false
+      ignore_errors: true
+
+    - name: Get latest k9s release info
+      uri:
+        url: https://api.github.com/repos/derailed/k9s/releases/latest
+        return_content: yes
+        headers:
+          Accept: application/vnd.github.v3+json
+      register: k9s_release_info
+      when: k9s_installed.rc != 0
+
+    - name: Set k9s download URL for ARM64
+      set_fact:
+        k9s_download_url: "{{ k9s_release_info.json.assets | selectattr('name', 'equalto', 'k9s_Linux_arm64.tar.gz') | map(attribute='browser_download_url') | first }}"
+      when: k9s_installed.rc != 0
+
+    - name: Create a temporary directory for k9s extraction
+      ansible.builtin.tempfile:
+        state: directory
+      register: tmp_extraction_dir
+      when: k9s_installed.rc != 0
+
+    - name: Download k9s binary for ARM64
+      command:
+        cmd: wget -O /tmp/k9s_Linux_arm64.tar.gz "{{ k9s_download_url }}"
+      args:
+        creates: /tmp/k9s_Linux_arm64.tar.gz
+      when: k9s_installed.rc != 0
+
+    - name: Extract k9s binary to the temporary directory
+      unarchive:
+        src: "/tmp/k9s_Linux_arm64.tar.gz"
+        dest: "{{ tmp_extraction_dir.path }}"
+        remote_src: yes
+      when: k9s_installed.rc != 0
+
+    - name: Copy k9s binary to /usr/local/bin/
+      command:
+        cmd: cp "{{ tmp_extraction_dir.path }}/k9s" /usr/local/bin/k9s
+      args:
+        creates: /usr/local/bin/k9s
+      when: k9s_installed.rc != 0
+
+    - name: Set execute permission on k9s binary
+      file:
+        path: /usr/local/bin/k9s
+        mode: '0755'
+      when: k9s_installed.rc != 0
+
+    - name: Remove temporary files and directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/k9s_Linux_arm64.tar.gz"
+        - "{{ tmp_extraction_dir.path }}"
+      when: k9s_installed.rc != 0
+
+    # Tasks for checking and installing kubectl
+    - name: Check if kubectl is installed
+      command: kubectl version --client=true --output=yaml
+      register: kubectl_installed
+      failed_when: false
+      changed_when: false
+      ignore_errors: true
+
+    - name: Get the latest stable version of kubectl
+      shell: curl -L -s https://dl.k8s.io/release/stable.txt
+      register: kubectl_version
+      when: kubectl_installed.rc != 0
+
+    - name: Download the latest stable version of kubectl for Linux ARM64
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version.stdout }}/bin/linux/arm64/kubectl"
+        dest: "/usr/local/bin/kubectl"
+        mode: '0755'
+      when: kubectl_installed.rc != 0
+
+    # Tasks for checking and installing Helm
+    - name: Check if Helm is installed
+      command: helm version --short
+      register: helm_installed
+      failed_when: false
+      changed_when: false
+      ignore_errors: true
+
+    - name: Download Helm Installation Script
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: "/tmp/get_helm.sh"
+        mode: '0700'
+      when: helm_installed.rc != 0
+
+    - name: Install Helm using the script
+      command: /tmp/get_helm.sh
+      when: helm_installed.rc != 0
+
+    - name: Remove Helm installation script
+      file:
+        path: "/tmp/get_helm.sh"
+        state: absent
+      when: helm_installed.rc != 0

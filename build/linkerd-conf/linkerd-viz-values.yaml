@@ -1,0 +1,29 @@
+# Skip namespace creation
+# When set to false, Helm will not create the namespace for the Linkerd Viz installation.
+# This is useful if you want to manage namespace creation separately or if the namespace already exists.
+installNamespace: false
+
+# Prometheus configuration
+prometheus:
+  # Disable the Prometheus installation that comes with the Linkerd Viz extension.
+  # This is useful if you already have a Prometheus instance in your cluster and wish to use that for collecting metrics.
+  enabled: false
+
+# Specify the URL of an external Prometheus instance.
+# This setting is necessary when you've disabled the bundled Prometheus as it directs the Linkerd Viz components to the correct Prometheus instance for fetching metrics.
+# The example URL points to a Prometheus instance deployed in the "monitoring" namespace, accessible within the cluster.
+prometheusUrl: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+
+# Grafana configuration
+grafana:
+  # Specify the URL of an external Grafana instance.
+  # When using an existing Grafana setup, this URL allows Linkerd Viz to integrate with it for visualizing metrics.
+  # The example URL points to a Grafana service deployed in the "monitoring" namespace.
+  url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+
+# Disabling DNS rebinding protection (specific to installations using Traefik as ingress)
+# The dashboard configuration allows specifying host enforcement policies for accessing the Linkerd dashboard through an ingress.
+# Uncommenting the below lines and setting `enforcedHostRegexp` to ".*" disables DNS rebinding protection.
+# This can be necessary in specific scenarios where DNS rebinding checks prevent accessing the dashboard through Traefik.
+# dahsboard:
+#   enforcedHostRegexp: ".*"

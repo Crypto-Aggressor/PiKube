@@ -1,0 +1,41 @@
+chain prerouting {
+    # Policy: Drop any forwarded traffic by default
+    type filter hook forward priority 0; policy drop;
+
+    # General global rules (e.g. established/related traffic)
+    jump global
+
+    # Allow specific LAN to WAN TCP traffic
+    # This rule checks if the source is from our LAN and destination is WAN
+    # and allows specific TCP ports defined in forward_tcp_accept
+    iifname $lan_interface ip saddr $lan_network oifname $wan_interface tcp dport @forward_tcp_accept ct state new accept
+
+    # Allow specific LAN to WAN UDP traffic
+    # Similar to the above, but for UDP ports defined in forward_udp_accept
+    iifname $lan_interface ip saddr $lan_network oifname $wan_interface udp dport @forward_udp_accept ct state new accept
+
+    # Allow incoming SSH traffic from WAN to our LAN
+    # This rule checks for incoming SSH traffic from the WAN and forwards it to our LAN
+    iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport ssh ct state new accept
+
+    # Allow incoming HTTP and HTTPS traffic from WAN to our LAN
+    iifname $wan_interface oifname $lan_interface ip daddr $lan_network tcp dport { http, https } ct state new accept
+
+    # Allow s3 (MinIO) traffic from WAN to a specific IP in our LAN
+    # This rule allows traffic to ports 9091 and 9092 (typically used by MinIO) on IP 10.0.0.10
+    iifname $wan_interface oifname $lan_interface ip daddr 10.0.0.10 tcp dport { 9091, 9092 } ct state new accept
+
+    # Allow port-forwarding traffic (e.g. for Kubernetes services) from WAN to IP 10.0.0.10 on port 8080
+    iifname $wan_interface oifname $lan_interface ip daddr 10.0.0.10 tcp dport 8080 ct state new accept
+
+    # Allow Vault traffic from WAN to a specific IP in our LAN on Vault's ports
+    # This rule forwards traffic to Vault's ports (8200 and 8201) on IP 10.0.0.10
+    iifname $wan_interface oifname $lan_interface ip daddr 10.0.0.10 tcp dport $vault_ports ct state new accept
+
+    # Note for users: Instructions on how to use kubectl for port-forwarding
+    # kubectl port-forward svc/[service-name] -n [namespace] [external-port]:[internal-port] --address 0.0.0.0
+
+    # Log dropped forwarded traffic
+    log prefix "[FORWARD DROP]:" limit rate 2/minute
+    drop
+}

@@ -1,0 +1,108 @@
+---
+- name: Find Orange Pi IP Address
+  hosts: gateway
+  gather_facts: no
+  become: true
+  tasks:
+    - name: Ensure arp-scan is installed
+      ansible.builtin.apt:
+        name: arp-scan
+        state: present
+
+    - name: Scan for Orange Pi IP Address
+      ansible.builtin.shell: "sudo arp-scan --localnet | grep '5a:12:06:12:dc:2b' | awk '{print $1}'"
+      register: orange_pi_ip_raw
+      changed_when: False
+
+    - name: Set Orange Pi IP
+      set_fact:
+        orange_pi_ip: "{{ orange_pi_ip_raw.stdout_lines[0] }}"
+    
+    - name: Add Orange Pi to inventory
+      add_host:
+        name: "orange_pi"
+        ansible_host: "{{ orange_pi_ip }}"
+        ansible_ssh_user: "ubuntu"
+        ansible_ssh_pass: "qwerty"
+        ansible_become_pass: "qwerty"
+      changed_when: False
+
+    # - name: Install expect on Gateway
+    #   ansible.builtin.apt:
+    #     name: expect
+    #     state: present
+
+    # - name: Change Ubuntu default password on Orange Pi
+    #   expect:
+    #     command: ssh -o StrictHostKeyChecking=no ubuntu@{{ orange_pi_ip }}
+    #     responses:
+    #       "(yes/no)?": "yes"
+    #       'ubuntu@.* password': 'ubuntu'
+    #       'Current password:': 'ubuntu'
+    #       'New password:': 'qwerty'
+    #       'Retype new password:': 'qwerty'
+    #   ignore_errors: true
+
+- name: Setup Orange Pi
+  hosts: orange_pi
+  gather_facts: no
+  become: true
+  become_method: sudo
+  vars:
+    ansible_ssh_user: ubuntu
+    ansible_ssh_pass: qwerty
+    ansible_become_pass: qwerty
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+  tasks:
+    # - name: Update and Upgrade Ubuntu
+    #   ansible.builtin.apt:
+    #     update_cache: yes
+    #     upgrade: 'dist'
+
+    - name: Set Timezone to Europe/London
+      ansible.builtin.timezone:
+        name: Europe/London
+
+    - name: Set Locale to en_GB.UTF-8
+      ansible.builtin.locale_gen:
+        name: en_GB.UTF-8
+        state: present
+
+    - name: Change hostname to mandarine-worker
+      ansible.builtin.hostname:
+        name: mandarine-worker
+
+    - name: Create User pi
+      ansible.builtin.user:
+        name: pi
+        group: sudo
+        shell: /bin/bash
+        create_home: yes
+        generate_ssh_key: no
+
+    - name: Add User pi to sudoers
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        line: 'pi ALL=(ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Create group pi
+      ansible.builtin.group:
+        name: pi
+        state: present
+    - name: Setup SSH Directory for User pi
+      ansible.builtin.file:
+        path: /home/pi/.ssh
+        state: directory
+        mode: '0700'
+        owner: pi
+        group: pi
+
+    - name: Add SSH Key to authorized_keys for User pi
+      ansible.builtin.copy:
+        dest: /home/pi/.ssh/authorized_keys
+        content: |
+          ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCvE8ju9IxfwyEj0NSJhqrI2sob6QfpEuCAJurNc2XA54/pldF3CpvJlijTOPk2Q3m115DIE/MIGbltki8z59JdMmd/k+kxoXKfF/oZJmolyr6A6sxmtOyi+2Zcf+T/XPg6OEvYfIV3dK5lsIEUl4fDYRIGKcnzVplfJ/lG7N6IV55zvVzFTaehVA1HasLpJ2wDUUQVGMSnWFf16N8r0CscZebxZAzZoHB1SLUEZcQ3EkcM0+DMRXb9jtvLnnLJ6QNLnYOwS4gQ3Myrh2I1IyhnZIA2UQyYyqL1Z3iFfM27NhRFS8WvltDF1a58uXlN9p8bp6/dZRJnzMhNXrAMkwVixGx+nfmO9RNWHDQU7kUJEqmzXuyf6TjGtl1Csk+YvYpe+m1p4plyXDed5O3NtdHQ0O5BbXii5bLceTY2KucI15Mf4ClWihdVLmipRgwzNSmlZMoI8TRspOaTTI8KZ/VKvmbrKSBaNPKxTkP9+0J3fQPk10Qwc6xOJx80/ldOn30= amine@Who-Am-I
+        mode: '0600'
+        owner: pi
+        group: pi

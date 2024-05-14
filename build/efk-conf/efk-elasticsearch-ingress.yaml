@@ -1,0 +1,26 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: elasticsearch-ingress
+  namespace: logging
+  annotations:
+    cert-manager.io/cluster-issuer: picluster-ca-issuer
+    cert-manager.io/common-name: elasticsearch.picluster.quantfinancehub.com
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - elasticsearch.picluster.quantfinancehub.com
+      secretName: elasticsearch-tls
+  rules:
+    - host: elasticsearch.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: efk-es-http
+                port:
+                  number: 9200

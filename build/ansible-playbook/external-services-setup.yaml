@@ -1,0 +1,324 @@
+# external-services-setup.yaml
+---
+# This playbook is designed to setup and configure external services such as Minio and HashiCorp Vault. It handles
+# security through TLS certificates, either using Let's Encrypt for verified certificates or generating self-signed ones,
+# and includes configuration for both Minio S3 storage and HashiCorp Vault for secrets management.
+
+# Install and configure Minio S3 Storage Server on a designated host.
+- name: Configure Minio S3 Storage on s3 host
+  hosts: s3
+  gather_facts: true
+  become: true # Elevate privileges
+  tags: [minio_certificates]
+  vars:
+    server_hostname: "{{ minio_hostname }}"
+    propagation_seconds: 60
+    cloudflare_credentials_path: "/home/pi/.secrets/certbot/cloudflare.ini"
+    selfsigned_certificates_path: "../certificates"
+
+  pre_tasks:
+  - name: Include required variables
+    include_vars: "{{ item }}"
+    loop:
+      - "vars/vault.yaml"
+      - "vars/pikube-cluster.yaml"
+
+    # Task to obtain TLS certificates from Let's Encrypt using the DNS challenge method.
+  - name: Create Let's Encrypt certificate for MinIO
+    command: >
+      certbot certonly
+      --authenticator dns-cloudflare
+      --dns-cloudflare-credentials "{{ cloudflare_credentials_path }}"
+      --dns-cloudflare-propagation-seconds "{{ propagation_seconds }}"
+      --server https://acme-v02.api.letsencrypt.org/directory
+      --agree-tos
+      --non-interactive
+      --rsa-key-size 4096
+      -m "{{ acme_issuer_email }}"
+      -d "{{ minio_hostname }}"
+    register: certbot_create
+    become: true
+    when: enable_letsencrypt
+    changed_when: "'Certificate not yet due for renewal' not in certbot_create.stdout"
+
+    # Block to generate and configure self-signed TLS certificates if Let's Encrypt is not enabled.
+  - name: Create customCA-signed TLS certificate for MinIO
+    when: not enable_letsencrypt
+    block:
+      - name: Create certificates directory
+        file:
+          path: "{{ selfsigned_certificates_path }}"
+          state: directory
+          mode: 0750
+      - name: Include selfsigned certificates variables
+        include_vars: "vars/selfsigned-certificates.yaml"
+        args:
+          apply:
+            delegate_to: s3
+            become: false
+      - name: Generate custom CA
+        include_tasks: tasks/generate-custom-ca.yaml
+        args:
+          apply:
+            delegate_to: s3
+            become: false
+      - name: Generate customCA-signed SSL certificates
+        include_tasks: tasks/generate-ca-signed-cert.yaml
+        args:
+          apply:
+            delegate_to: s3
+            become: false
+        loop:
+          - "{{ minio_hostname }}"
+        loop_control:
+          loop_var: server_hostname
+
+      - name: Load customCA-signed TLS certificate for minio
+        set_fact:
+          minio_key: "{{ lookup('file',selfsigned_certificates_path + '/' + server_hostname + '.key') }}"
+          minio_cert: "{{ lookup('file',selfsigned_certificates_path + '/' + server_hostname + '.pem') }}"
+          minio_ca: "{{ lookup('file',selfsigned_certificates_path + '/CA.pem') }}"
+        when: not enable_letsencrypt
+
+    # Task block to handle existing Let's Encrypt certificates, checking their existence and loading them.
+  - name: Get certificate and key paths for MinIO
+    block:
+      - name: Check TLS certificate for MinIO exists
+        command: "certbot certificates -d {{ minio_hostname }}"
+        register: certbot_certificates
+        delegate_to: s3
+        become: true
+        changed_when: false
+        failed_when:
+          - '"Certificate Name: " + minio_hostname not in certbot_certificates.stdout'
+
+      - name: Get certificate and key paths for MinIO
+        set_fact:
+          cert_path: "{{ certbot_certificates.stdout | regex_search(regexp1,'\\1') }}"
+          cert_key_path: "{{ certbot_certificates.stdout | regex_search(regexp2,'\\1') }}"
+        vars:
+          regexp1: 'Certificate Path: (\S+)'
+          regexp2: 'Private Key Path: (\S+)'
+        when:
+          - certbot_certificates.rc==0
+          - '"Certificate Name: " + minio_hostname in certbot_certificates.stdout'
+
+      - name: Slurp tls key
+        slurp:
+          src: "{{ cert_key_path[0] }}"
+        register: minio_key_slurp
+        when: enable_letsencrypt
+
+      - name: Slurp tls cert
+        slurp:
+          src: "{{ cert_path[0] }}"
+        register: minio_cert_slurp
+        when: enable_letsencrypt
+
+      - name: Set tls key and cert facts
+        set_fact:
+          minio_key: "{{ minio_key_slurp['content'] | b64decode }}"
+          minio_cert: "{{ minio_cert_slurp['content'] | b64decode }}"
+        when: enable_letsencrypt
+  roles:
+    - role: ricsanfre.minio
+
+
+## Install Hashicorp Vault Server
+# Requirements to be installed: ansible-galaxy collection install community.hashi_vault
+- name: Install Vault Server
+  hosts: gateway
+  gather_facts: true
+  tags: [vault]
+  become: true
+  vars:
+    server_hostname: "{{ vault_hostname }}"
+    propagation_seconds: 60
+    cloudflare_credentials_path: "/home/pi/.secrets/certbot/cloudflare.ini"
+    selfsigned_certificates_path: "../certificates"
+
+  pre_tasks:
+    - name: Include required variables
+      include_vars: "{{ item }}"
+      loop:
+        - "vars/vault.yaml"
+        - "vars/pikube-cluster.yaml"
+
+    - name: Create customCA-signed TLS certificate for Vault
+      when: not enable_letsencrypt
+      block:
+        - name: Create certificates directory
+          file:
+            path: "{{ selfsigned_certificates_path }}"
+            state: directory
+            mode: 0750
+        - name: Include selfsigned certificates variables
+          include_vars: "vars/selfsigned-certificates.yaml"
+          args:
+            apply:
+              delegate_to: gateway
+              become: false
+        - name: Generate custom CA
+          include_tasks: tasks/generate-custom-ca.yaml
+          args:
+            apply:
+              delegate_to: gateway
+              become: false
+        - name: Generate customCA-signed SSL certificates
+          include_tasks: tasks/generate-ca-signed-cert.yaml
+          args:
+            apply:
+              delegate_to: gateway
+              become: false
+          loop:
+            - "{{ vault_hostname }}"
+          loop_control:
+            loop_var: server_hostname
+
+    - name: Load customCA-signed TLS certificate for Vault
+      set_fact:
+        vault_key: "{{ lookup('file',selfsigned_certificates_path + '/' + server_hostname + '.key') }}"
+        vault_cert: "{{ lookup('file',selfsigned_certificates_path + '/' + server_hostname + '.pem') }}"
+        vault_ca: "{{ lookup('file',selfsigned_certificates_path + '/CA.pem') }}"
+      when: not enable_letsencrypt
+
+    - name: Get letsencrypt TLS certificate for Vault
+      block:
+        - name: check TLS certificate for vault exits
+          command: "certbot certificates -d {{ vault_hostname }}"
+          register: certbot_certificates
+          delegate_to: gateway
+          become: true
+          changed_when: false
+          failed_when:
+            - '"Certificate Name: " + vault_hostname not in certbot_certificates.stdout'
+        
+        - name: Get certificate and key paths for vault
+          set_fact:
+            cert_path: "{{ certbot_certificates.stdout | regex_search(regexp1,'\\1') }}"
+            cert_key_path: "{{ certbot_certificates.stdout | regex_search(regexp2,'\\1') }}"
+          vars:
+            regexp1: 'Certificate Path: (\S+)'
+            regexp2: 'Private Key Path: (\S+)'
+          when:
+            - certbot_certificates.rc==0
+            - '"Certificate Name: " + vault_hostname in certbot_certificates.stdout'
+
+        - name: Slurp tls key
+          slurp:
+            src: "{{ cert_key_path[0] }}"
+          register: vault_key_slurp
+          when: enable_letsencrypt
+
+        - name: Slurp tls cert
+          slurp:
+            src: "{{ cert_path[0] }}"
+          register: vault_cert_slurp
+          when: enable_letsencrypt
+
+        - name: Set tls key and cert facts
+          set_fact:
+            vault_key: "{{ vault_key_slurp['content'] | b64decode }}"
+            vault_cert: "{{ vault_cert_slurp['content'] | b64decode }}"
+          when: enable_letsencrypt
+
+  roles:
+    - role: ricsanfre.vault
+
+  tasks:
+    # Configure ansible user profile with VAULT environement variables
+    - name: Insert http(s) export in dotfile
+      become: true
+      lineinfile:
+        path: ~{{ ansible_user }}/.bashrc
+        regexp: "^export VAULT_ADDR="
+        line: "export VAULT_ADDR='https://{{ vault_hostname }}:8200'"
+        owner: "{{ ansible_user }}"
+        create: true
+        mode: 0644
+    - name: Insert CA cert export in dotfile
+      become: true
+      lineinfile:
+        path: ~{{ ansible_user }}/.bashrc
+        regexp: "^export VAULT_CACERT="
+        line: "export VAULT_CACERT=/etc/vault/tls/vault-ca.crt"
+        owner: "{{ ansible_user }}"
+        create: true
+        mode: 0644
+      when: custom_ca
+
+    - name: Insert VAULT_TOKEN in dotfile
+      become: true
+      lineinfile:
+        path: ~{{ ansible_user }}/.bashrc
+        regexp: "^export VAULT_TOKEN="
+        line: "export VAULT_TOKEN=$(sudo jq -r '.root_token' /etc/vault/unseal.json)"
+        owner: "{{ ansible_user }}"
+        create: true
+        mode: 0644
+
+## Load all credentials into Hashicorp Vault Server
+- name: Load Vault Credentials
+  hosts: gateway
+  gather_facts: true
+  tags: [vault, credentials]
+  become: false
+  pre_tasks:
+    # Include vault variables
+    - name: Include vault variables
+      include_vars: "vars/vault.yaml"
+
+    # Include picluster variables
+    - name: Include picluster variables
+      include_vars: "vars/pikube-cluster.yaml"
+
+    # Install hashicorp vault collection dependencies (hvac python package) using PIP.
+    - name: Ensure PIP is installed.
+      package:
+        name:
+          - python3-pip
+          - python3-setuptools
+        state: present
+      become: true
+    - name: Ensure hvac Python library is installed.
+      pip:
+        name: hvac
+        state: present
+      become: true
+  tasks:
+
+    # Vault Login using ansible environement variables for creating token file
+    # token file will be usd in next commands
+    - name: Vault login
+      ansible.builtin.shell: bash -ilc 'vault login $VAULT_TOKEN'
+      become: false
+      register: vault_login
+
+    # Create write token
+    - name: Create KV write token
+      community.hashi_vault.vault_token_create:
+        url: "https://{{ vault_dns }}:8200"
+        policies: ["write"]
+      register: token_data
+      become: false
+    # Load ansible vault variables into Hashicorp Vault Server
+    - name: Load vault credentials
+      include_tasks:
+        file: tasks/load-vault-credentials.yaml
+      loop: "{{ vault | dict2items }}"
+      loop_control:
+        loop_var: secret_group
+      when:
+        - vault is defined
+      no_log: false
+
+    - name: Load http auth_basic credentials
+      include_tasks:
+        file: tasks/create-basic-authentication-credentials.yaml
+      no_log: false
+
+    - name: Load minio prometheus bearer credentials
+      include_tasks:
+        file: tasks/create-minio-bearer-token.yaml
+      no_log: false
+

@@ -1,0 +1,10 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Repository
+metadata:
+  name: pikube-kubernetes-cluster-private-repo
+  namespace: argocd
+spec:
+  repo: git@github.com:Crypto-Aggressor/PiKube-Kubernetes-Cluster.git
+  sshPrivateKeySecret:
+    name: argocd-ssh-secret
+  type: git

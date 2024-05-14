@@ -1,0 +1,25 @@
+global:
+  storageClass: longhorn
+
+# Configuration for running Keycloak in production mode behind an NGINX reverse proxy.
+production: true
+proxy: edge
+
+auth:
+  adminUser: admin
+
+postgresql:
+  enabled: true
+  auth:
+    username: keycloak
+    database: keycloak
+
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: picluster-ca-issuer
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+  hostname: sso.picluster.quantfinancehub.com
+  tls: true
