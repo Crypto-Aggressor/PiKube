@@ -1,0 +1,33 @@
+chain input {
+    # Policy: By default, drop all incoming traffic 
+    type filter hook input priority 0; policy drop;
+
+    # General global rules (e.g. established/related traffic)
+    jump global
+
+    # No specific unwanted traffic to drop, thus placeholder for future rules if necessary
+    # (none)
+
+    # No specific unwanted IPv6 traffic to drop, thus placeholder for future rules if necessary
+    # (none)
+
+    # Accept all traffic coming to/from the localhost interface
+    # This ensures processes and services running on the same machine can communicate with each other
+    iif lo accept
+
+    # Allow all ICMP traffic (IPv4 and IPv6)
+    # ICMP is used for ping requests, error messages and other network diagnostic purposes
+    meta l4proto { icmp, icmpv6 } accept
+
+    # Allow incoming UDP traffic based on a predefined set of ports
+    # The specific ports are defined in the 'in_udp_accept' set (e.g. domain, ntp)
+    udp dport @in_udp_accept ct state new accept
+
+    # Allow incoming TCP traffic based on a predefined set of ports
+    # The specific ports are defined in the 'in_tcp_accept' set (e.g. http, https, ssh)
+    tcp dport @in_tcp_accept ct state new accept
+
+    # Log dropped traffic
+    log prefix "[INPUT DROP]:" limit rate 2/minute
+    drop
+}

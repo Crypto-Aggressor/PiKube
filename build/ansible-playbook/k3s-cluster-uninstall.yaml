@@ -1,0 +1,106 @@
+# k3s-master-setup.yaml
+---
+# This playbook uninstalls K3s from the Pi cluster and cleans up configurations.
+
+# Section for master nodes
+- name: Uninstall K3s from Master Nodes
+  hosts: k3s_master # Targets only master nodes as defined in the inventory
+  become: true # Elevate privileges
+  tasks:
+    - name: Stop K3s service
+      ansible.builtin.systemd: # Ensures the K3s service is stopped before uninstallation
+        name: k3s
+        state: stopped
+        enabled: no # Also ensures the service is not enabled to start on boot
+    
+    - name: Check if K3s uninstallation script exists on master nodes
+      ansible.builtin.stat: # Checks for the presence of the K3s uninstallation script
+        path: /usr/local/bin/k3s-uninstall.sh
+      register: k3s_uninstall_script_master # Registers the result to a variable
+
+    - name: Execute K3s uninstallation script on master nodes
+      ansible.builtin.shell: # Executes the uninstallation script if present
+        /usr/local/bin/k3s-uninstall.sh
+      when: k3s_uninstall_script_master.stat.exists # Conditional execution based on script presence
+      ignore_errors: true # Continues playbook execution even if this task fails
+
+# Section for worker nodes
+- name: Uninstall K3s from Worker Nodes
+  hosts: k3s_worker # Targets only worker nodes
+  become: true
+  tasks:
+    - name: Stop K3s service on worker nodes
+      ansible.builtin.systemd: # Stops the K3s agent service on worker nodes
+        name: k3s-agent
+        state: stopped
+        enabled: no
+
+    - name: Check if K3s agent uninstallation script exists on worker nodes
+      ansible.builtin.stat: # Checks for the agent uninstallation script
+        path: /usr/local/bin/k3s-agent-uninstall.sh
+      register: k3s_uninstall_script_worker
+
+    - name: Execute K3s agent uninstallation script on worker nodes
+      ansible.builtin.shell: # Executes the agent uninstallation script if found
+        /usr/local/bin/k3s-agent-uninstall.sh
+      when: k3s_uninstall_script_worker.stat.exists
+      ignore_errors: true
+
+# General cleanup section applicable to all nodes
+- name: Clean up configurations on all nodes
+  hosts: picluster
+  become: true
+  tasks:
+    - name: Remove K3s related directories
+      ansible.builtin.file: # Deletes directories created by K3s and its components
+        path: "{{ item }}"
+        state: absent # Ensures the specified directories are removed
+      loop: # A list of directories to remove
+        - /etc/rancher
+        - /var/lib/rancher
+        - /var/lib/kubelet
+        - /etc/cni
+        - /var/lib/etcd
+        - /run/k3s
+        - /run/flannel
+        - /usr/local/bin/k3s
+        - /usr/local/bin/kubectl
+        - /var/lib/containerd
+
+    - name: Revert cmdline for Raspberry Pi nodes
+      lineinfile: # Removes specific cmdline arguments for Raspberry Pi nodes if present
+        path: /boot/firmware/cmdline.txt
+        regexp: '^(.*) cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory(.*)$'
+        line: '\1\2'
+        backrefs: yes # Utilizes back-referencing to replace matched content
+      when: inventory_hostname in groups['raspberrypi'] # Conditional to target only Raspberry Pi nodes
+
+    - name: Remove sysctl configuration for bridged network traffic
+      ansible.builtin.file: # Removes sysctl configuration file related to Kubernetes networking
+        path: /etc/sysctl.d/k8s.conf
+        state: absent
+
+    - name: Remove br_netfilter module loading configuration
+      ansible.builtin.file: # Removes module load configuration for br_netfilter
+        path: /etc/modules-load.d/k8s.conf
+        state: absent
+
+    - name: Reapply sysctl settings to ensure system defaults are used
+      ansible.builtin.command: # Applies current sysctl settings to ensure clean state
+        cmd: sysctl --system
+
+# Cleanup of Kubernetes configurations on the gateway node
+- name: Clean up .kube configurations on the gateway
+  hosts: gateway # Specifically targets the gateway node
+  become: true
+  tasks:
+    - name: Remove .kube directory and its contents
+      ansible.builtin.file: # Removes the .kube directory which contains Kubernetes config files
+        path: "/home/{{ ansible_user }}/.kube"
+        state: absent # Ensures the directory is deleted
+
+    - name: Remove KUBECONFIG setting from .bashrc
+      lineinfile: # Removes the KUBECONFIG environment variable setting from .bashrc
+        path: "/home/{{ ansible_user }}/.bashrc"
+        regexp: '^export KUBECONFIG=' # Matches the line to be removed
+        state: absent # Ensures the line is deleted

@@ -1,0 +1,90 @@
+# inventory.yaml
+---
+all:
+  children:
+    control:
+      hosts:
+        gateway:
+          hostname: gateway
+          ansible_host: 192.168.0.10
+          ip: 10.0.0.1
+          mac: d8:3a:dd:02:a3:d7
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        ansible-automaton:
+          hostname: ansible-automaton
+          ansible_host: localhost
+          ansible_connection: local
+    external:
+      hosts:
+        s3:
+          hostname: s3
+          ansible_host: 10.0.0.10
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+    picluster:
+      hosts:
+        node1:
+          hostname: blueberry-master
+          ansible_host: 10.0.0.10
+          ip: 10.0.0.10
+          mac: e4:5f:01:f5:c1:ae
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node2:
+          hostname: strawberry-master
+          ansible_host: 10.0.0.11
+          ip: 10.0.0.11
+          mac: e4:5f:01:df:31:a2
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node3:
+          hostname: blackberry-master
+          ansible_host: 10.0.0.12
+          ip: 10.0.0.12
+          mac: dc:a6:32:73:69:c9
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node4:
+          hostname: cranberry-worker
+          ansible_host: 10.0.0.13
+          ip: 10.0.0.13
+          mac: d8:3a:dd:b6:12:77
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node5:
+          hostname: raspberry-worker
+          ansible_host: 10.0.0.14
+          ip: 10.0.0.14
+          mac: b8:27:eb:d2:40:87
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node6:
+          hostname: orange-worker
+          ansible_host: 10.0.0.15
+          ip: 10.0.0.15
+          mac: d2:22:4c:9e:b4:6c
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+        node7:
+          hostname: mandarine-worker
+          ansible_host: 10.0.0.16
+          ip: 10.0.0.16
+          mac: e4:5f:01:d9:ec:5c
+          ansible_ssh_user: pi
+          ansible_ssh_private_key_file: ~/.ssh/gateway-pi
+    raspberrypi:
+      hosts:
+        node[1:5]:
+        gateway:
+    orangepi:
+      hosts:
+        node[6:7]:
+    k3s_cluster:
+      children:
+        k3s_master:
+          hosts:
+            node[1:3]:
+        k3s_worker:
+          hosts:
+            node[4:7]:

@@ -1,0 +1,171 @@
+# dns.yaml
+---
+- name: Setup DNS on Gateway
+  hosts: gateway
+  become: yes
+  vars:
+    base_path: "/mnt/c/Documents and Settings/amine/bin/github-projects/PiKube-Kubernetes-Cluster/build/dns-conf"
+
+  tasks:
+    # Ensure the system can reach the internet
+    - name: Check internet connectivity
+      command: ping -c 1 google.com
+      register: internet_check
+      ignore_errors: yes
+
+    # Ensure port 53 isn't already in use, which is essential for DNS
+    - name: Check if port 53 is already in use
+      shell: netstat -tuln | grep ":53 "
+      register: port_53_check
+      ignore_errors: yes
+
+    # Install dnsmasq package
+    - name: Install dnsmasq
+      apt:
+        name: dnsmasq
+        state: present
+
+    # Stop systemd-resolved, which can conflict with dnsmasq on port 53
+    - name: Stop systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: stopped
+      ignore_errors: yes
+
+    # Copy dnsmasq configuration file to the server
+    - name: Copy dnsmasq.conf to the server
+      copy:
+        src: "{{ base_path }}/dnsmasq-v1.conf"
+        dest: "/etc/dnsmasq.d/dnsmasq.conf"
+
+    # Enable dnsmasq service to start on boot
+    - name: Enable dnsmasq
+      systemd:
+        name: dnsmasq
+        enabled: yes
+
+    # Start dnsmasq service
+    - name: Start dnsmasq
+      systemd:
+        name: dnsmasq
+        state: started
+
+    # Modify resolved.conf to use the local DNS server (dnsmasq)
+    - name: Modify resolved.conf for local DNS
+      blockinfile:
+        path: /etc/systemd/resolved.conf
+        insertafter: EOF
+        block: |
+          [Resolve]
+          DNS=10.0.0.1
+          Domains=picluster.homelab.com
+
+    # Restart systemd-resolved to apply changes
+    - name: Restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
+
+    # Add logrotate configuration for dnsmasq to manage logs efficiently
+    - name: Set up log rotation for dnsmasq
+      copy:
+        src: "{{ base_path }}/dnsmasq-logrotate.conf"
+        dest: "/etc/logrotate.d/dnsmasq"
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Display dnsmasq status for verification
+    - name: Display dnsmasq status
+      debug:
+        msg: "{{ dnsmasq_status.stdout }}"
+      when: dnsmasq_status is defined
+
+    # Inform the user about the internet connectivity status
+    - name: Check internet connectivity result
+      debug:
+        msg: "Internet is {{ 'reachable' if internet_check.rc == 0 else 'unreachable' }}"
+
+    # Inform the user if port 53 is occupied or available
+    - name: Check port 53 conflict result
+      debug:
+        msg: "Port 53 is {{ 'in use by another process' if port_53_check.rc == 0 else 'available' }}"
+
+# - name: Setup DNS on Gateway
+#   hosts: gateway
+#   become: yes
+#   vars:
+#     base_path: "/mnt/c/Documents and Settings/amine/bin/github-projects/PiKube-Kubernetes-Cluster/build/dns-conf"
+
+#   tasks:
+#     - name: Check internet connectivity
+#       command: ping -c 1 google.com
+#       register: internet_check
+#       ignore_errors: yes  # Ignore errors if ping fails
+
+#     - name: Check if port 53 is already in use
+#       shell: netstat -tuln | grep ":53 "
+#       register: port_53_check
+#       ignore_errors: yes
+
+#     - name: Install dnsmasq
+#       apt:
+#         name: dnsmasq
+#         state: present
+#       register: dnsmasq_installed
+
+#     - name: Stop systemd-resolved
+#       systemd:
+#         name: systemd-resolved
+#         state: stopped
+#       ignore_errors: yes  # Ignore errors if systemd-resolved is not running
+
+#     - name: Restart systemd-resolved
+#       systemd:
+#         name: systemd-resolved
+#         state: restarted
+#       ignore_errors: yes  # Ignore errors if systemd-resolved was not running
+
+#     - name: Copy dnsmasq.conf to the server
+#       copy:
+#         src: "{{ base_path }}/dnsmasq-v1.conf"
+#         dest: "/etc/dnsmasq.d/dnsmasq.conf"
+
+#     - name: Start dnsmasq
+#       systemd:
+#         name: dnsmasq
+#         state: started
+#       register: dnsmasq_status  # Register the status of dnsmasq
+
+#     - name: Enable dnsmasq
+#       systemd:
+#         name: dnsmasq
+#         enabled: yes
+
+#     - name: Modify resolved.conf for local DNS
+#       blockinfile:
+#         path: /etc/systemd/resolved.conf
+#         insertafter: EOF
+#         block: |
+#           [Resolve]
+#           DNS=10.0.0.1
+#           Domains=picluster.homelab.com
+
+#     - name: Restart systemd-resolved again
+#       systemd:
+#         name: systemd-resolved
+#         state: restarted
+
+#     - name: Display dnsmasq status
+#       debug:
+#         msg: "{{ dnsmasq_status.stdout }}"
+
+#     - name: Check internet connectivity result
+#       debug:
+#         msg: "Internet is {{ 'reachable' if internet_check.rc == 0 else 'unreachable' }}"
+
+#     - name: Check port 53 conflict result
+#       debug:
+#         msg: "Port 53 is {{ 'in use by another process' if port_53_check.rc == 0 else 'available' }}"
+
+

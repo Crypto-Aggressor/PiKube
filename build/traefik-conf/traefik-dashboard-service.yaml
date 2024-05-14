@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-dashboard
+  namespace: traefik
+  labels:
+    app.kubernetes.io/instance: traefik
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/component: traefik-dashboard
+spec:
+  type: ClusterIP                     # Internal service type
+  ports:
+    - name: traefik
+      port: 9000                      # External port
+      targetPort: traefik             # Port on the pod
+      protocol: TCP
+  selector:
+    app.kubernetes.io/instance: traefik-traefik
+    app.kubernetes.io/name: traefik

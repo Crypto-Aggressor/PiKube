@@ -1,0 +1,50 @@
+# Define a set to match addresses that should be treated as blackholes (i.e., to be dropped).
+set blackhole {
+    type ipv4_addr;
+    # Use the predefined list of badcast addresses.
+    elements = $badcast_addr
+}
+
+# Define a set for TCP services that should be allowed for forwarded traffic.
+set forward_tcp_accept {
+    type inet_service; flags interval;
+    # Combine the predefined forward TCP accept services with Vault ports.
+    elements = $forward_tcp_accept
+}
+
+# Define a set for UDP services that should be allowed for forwarded traffic.
+set forward_udp_accept {
+    type inet_service; flags interval;
+    elements = $forward_udp_accept
+}
+
+# Define a set for TCP services that should be allowed for incoming traffic.
+set in_tcp_accept {
+    type inet_service; flags interval;
+    # Combine the predefined incoming TCP accept services with Vault ports.
+    elements = $in_tcp_accept
+}
+
+# Define a set for UDP services that should be allowed for incoming traffic.
+set in_udp_accept {
+    type inet_service; flags interval;
+    elements = $in_udp_accept
+}
+
+# Define a set to match IPv6 addresses that should be treated as blackholes.
+set ip6_blackhole {
+    type ipv6_addr;
+    elements = $ip6_badcast_addr
+}
+
+# Define a set for TCP services that should be allowed for outgoing traffic.
+set out_tcp_accept {
+    type inet_service; flags interval;
+    elements = $out_tcp_accept
+}
+
+# Define a set for UDP services that should be allowed for outgoing traffic.
+set out_udp_accept {
+    type inet_service; flags interval;
+    elements = $out_udp_accept
+}

@@ -1,0 +1,86 @@
+# ntp.yaml
+---
+- name: Setup NTP on Gateway
+  hosts: gateway
+  become: yes
+  tasks:
+    - name: Install chrony
+      apt:
+        name: chrony
+        state: present
+
+    - name: Backup the original chrony.conf
+      copy:
+        src: /etc/chrony/chrony.conf
+        dest: /etc/chrony/chrony.conf.bak
+        remote_src: true
+
+    - name: Remove default pool entries from chrony.conf
+      lineinfile:
+        path: /etc/chrony/chrony.conf
+        state: absent
+        regexp: '^pool '
+        backup: yes
+
+    - name: Configure NTP servers in chrony.conf
+      blockinfile:
+        path: /etc/chrony/chrony.conf
+        block: |
+          pool 0.ubuntu.pool.ntp.org iburst
+          pool 1.ubuntu.pool.ntp.org iburst
+          pool 2.ubuntu.pool.ntp.org iburst
+          pool 3.ubuntu.pool.ntp.org iburst
+          allow 10.0.0.0/24
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - NTP Configuration"
+        backup: yes
+
+    - name: Ensure chrony is started and enabled
+      systemd:
+        name: chrony
+        state: started
+        enabled: true
+
+    - name: Confirm NTP status with timedatectl
+      command: timedatectl
+      register: timedatectl_status
+      changed_when: false
+
+    - name: Display timedatectl status
+      debug:
+        msg: "{{ timedatectl_status.stdout }}"
+
+- name: Setup NTP on Pi Cluster Nodes
+  hosts: picluster
+  become: yes
+  tasks:
+    - name: Install chrony on nodes
+      apt:
+        name: chrony
+        state: present
+
+    - name: Backup the original chrony.conf on nodes
+      copy:
+        src: /etc/chrony/chrony.conf
+        dest: /etc/chrony/chrony.conf.bak
+        remote_src: true
+
+    - name: Remove existing server entries in chrony.conf on nodes
+      lineinfile:
+        path: /etc/chrony/chrony.conf
+        state: absent
+        regexp: '^server '
+        backup: yes
+
+    - name: Configure gateway as NTP server in chrony.conf on nodes
+      blockinfile:
+        path: /etc/chrony/chrony.conf
+        block: |
+          server 10.0.0.1 iburst
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - NTP Configuration"
+        backup: yes
+
+    - name: Restart and enable chrony on nodes
+      systemd:
+        name: chrony
+        state: restarted
+        enabled: true

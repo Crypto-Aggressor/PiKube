@@ -1,0 +1,23 @@
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: traefik-redirect
+  namespace: traefik
+  annotations:
+    # Use redirect Middleware configured
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-redirect@kubernetescrd
+    # HTTP as entrypoint
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: traefik.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: traefik-dashboard
+                port:
+                  number: 9000

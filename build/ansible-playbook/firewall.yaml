@@ -1,0 +1,53 @@
+# firewall.yaml
+---
+- name: Configure Gateway
+  hosts: gateway
+  become: yes
+  vars:
+    base_path: "/mnt/c/Documents and Settings/amine/bin/github-projects/PiKube-Kubernetes-Cluster/build/firewall-conf"
+    files_to_copy:
+      - { src: "{{ base_path }}/nftables.conf", dest: "/etc/nftables.conf" }
+      - { src: "{{ base_path }}/defines.nft", dest: "/etc/nftables.d/defines.nft" }
+      - { src: "{{ base_path }}/sets.nft", dest: "/etc/nftables.d/sets.nft" }
+      - { src: "{{ base_path }}/filter-input.nft", dest: "/etc/nftables.d/filter-input.nft" }
+      - { src: "{{ base_path }}/filter-output.nft", dest: "/etc/nftables.d/filter-output.nft" }
+      - { src: "{{ base_path }}/filter-forward.nft", dest: "/etc/nftables.d/filter-forward.nft" }
+      - { src: "{{ base_path }}/nat-prerouting.nft", dest: "/etc/nftables.d/nat-prerouting.nft" }
+      - { src: "{{ base_path }}/nat-postrouting.nft", dest: "/etc/nftables.d/nat-postrouting.nft" }
+      
+  tasks:
+    - name: Enable IP Forwarding
+      lineinfile:
+        path: /etc/sysctl.conf
+        regexp: '^#net.ipv4.ip_forward=1'
+        line: 'net.ipv4.ip_forward=1'
+      notify: Reload sysctl
+      
+    - name: Ensure nftables is installed
+      package:
+        name: nftables
+        state: present
+      
+    - name: Ensure /etc/nftables.d directory exists
+      file:
+        path: /etc/nftables.d
+        state: directory
+
+    - name: Copy required files to the gateway
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      loop: "{{ files_to_copy }}"
+      
+    - name: Validate the nftables.conf file
+      command: nft -c -f /etc/nftables.conf
+      
+    - name: Ensure nftables service is enabled and started
+      systemd:
+        name: nftables
+        enabled: yes
+        state: started
+      
+  handlers:
+    - name: Reload sysctl
+      command: sysctl -p

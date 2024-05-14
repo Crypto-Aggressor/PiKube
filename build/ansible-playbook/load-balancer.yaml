@@ -1,0 +1,60 @@
+---
+- name: Deploy HAProxy Load Balancer
+  hosts: gateway
+  become: yes
+  vars:
+    base_path: "/mnt/c/Documents and Settings/amine/bin/github-projects/PiKube-Kubernetes-Cluster/build/load-balancer-haproxy-conf"
+    haproxy_config_path: "{{ base_path }}/haproxy.cfg"
+
+  tasks:
+    # 1. Ensure HAProxy is installed.
+    - name: Check if haproxy is installed
+      shell: dpkg -l | grep haproxy
+      register: haproxy_check
+      changed_when: False
+      ignore_errors: True
+
+    - name: Install haproxy if not installed
+      apt:
+        name: haproxy
+        state: present
+      when: '"haproxy" not in haproxy_check.stdout'
+      tags:
+        - installation
+
+    # 2. Set up the HAProxy configuration.
+    - name: Copy haproxy.cfg to the remote server
+      copy:
+        src: "{{ haproxy_config_path }}"
+        dest: "/etc/haproxy/haproxy.cfg"
+        mode: '0644'
+        owner: root
+        group: root
+      tags:
+        - configuration
+
+    # 3. Verify that the configuration is correct.
+    - name: Check if the HAProxy configuration file is valid
+      command: haproxy -c -f /etc/haproxy/haproxy.cfg
+      register: config_check
+      changed_when: False
+      failed_when: '"valid" not in config_check.stdout'
+      tags:
+        - validation
+
+    # 4. Ensure HAProxy is operational.
+    - name: Ensure HAProxy is started and enabled
+      systemd:
+        name: haproxy
+        state: started
+        enabled: true
+      tags:
+        - service
+
+    # 5. Confirm HAProxy is active and running.
+    - name: Check HAProxy status
+      command: systemctl status haproxy
+      changed_when: False
+      ignore_errors: True
+      tags:
+        - verification

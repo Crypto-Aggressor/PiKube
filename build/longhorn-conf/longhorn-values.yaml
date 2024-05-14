@@ -1,0 +1,17 @@
+---
+defaultSettings:
+  defaultDataPath: "/storage"
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  host: longhorn.picluster.quantfinancehub.com
+  tls: true
+  tlsSecret: longhorn-tls
+  path: "/"
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: nginx/basic-auth-secret
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    cert-manager.io/common-name: longhorn.picluster.quantfinancehub.com

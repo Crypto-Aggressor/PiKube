@@ -1,0 +1,37 @@
+# free-resources.yaml
+---
+- name: Remove Snap Packages
+  hosts: gateway
+  become: yes  # This is required because you might need sudo privileges to remove Snap packages and perform autoremove.
+  vars:
+    retry_count: 0
+
+  tasks:
+    - name: List snap packages
+      shell: |
+        for i in `snap list | awk '!/Name/{print $1}'`;
+        do echo $i;
+        done
+      changed_when: false
+      register: snap_packages
+
+    - name: Remove snap packages
+      command: snap remove {{ item }}
+      register: snap_remove_output
+      with_items: "{{ snap_packages.stdout_lines }}"
+      ignore_errors: true
+
+    - name: Check if snap remove failed
+      fail:
+        msg: "Snap package removal failed after multiple attempts"
+      when: snap_remove_output.failed and retry_count >= 3
+
+    - name: If snap removal failed, retry
+      include_tasks: remove_snap_packages.yml
+      when: snap_remove_output.failed and retry_count < 3
+
+    - name: Run 'apt autoremove' to clean up unused packages
+      apt:
+        autoremove: yes
+
+

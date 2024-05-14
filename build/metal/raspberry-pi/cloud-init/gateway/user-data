@@ -1,0 +1,41 @@
+#cloud-config
+
+# Set the timezone and locale
+timezone: Europe/London
+locale: en_GB.UTF-8
+
+# Set the hostname
+hostname: gateway
+
+# Manage /etc/hosts; only hostname is added
+manage_etc_hosts: localhost
+
+# User setup
+users:
+  - name: pi
+    primary_group: users
+    groups: [adm, admin]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCvE8ju9IxfwyEj0NSJhqrI2sob6QfpEuCAJurNc2XA54/pldF3CpvJlijTOPk2Q3m115DIE/MIGbltki8z59JdMmd/k+kxoXKfF/oZJmolyr6A6sxmtOyi+2Zcf+T/XPg6OEvYfIV3dK5lsIEUl4fDYRIGKcnzVplfJ/lG7N6IV55zvVzFTaehVA1HasLpJ2wDUUQVGMSnWFf16N8r0CscZebxZAzZoHB1SLUEZcQ3EkcM0+DMRXb9jtvLnnLJ6QNLnYOwS4gQ3Myrh2I1IyhnZIA2UQyYyqL1Z3iFfM27NhRFS8WvltDF1a58uXlN9p8bp6/dZRJnzMhNXrAMkwVixGx+nfmO9RNWHDQU7kUJEqmzXuyf6TjGtl1Csk+YvYpe+m1p4plyXDed5O3NtdHQ0O5BbXii5bLceTY2KucI15Mf4ClWihdVLmipRgwzNSmlZMoI8TRspOaTTI8KZ/VKvmbrKSBaNPKxTkP9+0J3fQPk10Qwc6xOJx80/ldOn30= amine@Who-Am-I
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCvKS1Jc1KelB9dRhKwIP9oGNBanaRdTrmXVdc4syaXj7tUzvQlFWfrk9r+56DGyJNODIp/BOi8Q6QfCp2duJhDqd3ZY+VNqHQ8okFy+dmep8dP7N3VjKOfXMsFKNyykjycdLoaQkZclGZw3HZ+xTbCxCrdNAyzLqISepZp10dVoNfa2j5qEhdTcZxB/VFwvSc5rsWgAs5RBDAGc0MVqBq7ASI0Nrkkr99KhcJ5zsVl9+sNf/tt3oI6iv94CtCVG7XAvWxfBK8WODzzd0MiVfIaUiEgBpys8IS399VWEcy+kz7XwWZ0+mEsNR8dTSTIuVGRi8K9cp3vPKMb49AyXesRHf9N7G1VvKeo85f5MN0dU4yUwgHCjY3WM5oelcLU7iemeDz/DILA7wvv4xa/u3P5elcP1GpiBpER2F4fU+oGqIXP782OhIImQ0K+9AdEBRypfGifnefhGNRDwc+vWdZoLMCoez28T4/X3ayDwYYKmqIsglrqDE+j+o1dSOYnUmE= root@localhost
+
+# Commands to run at first boot
+runcmd:
+  # Append SSH aliases to .bashrc for user 'pi'
+  - echo 'alias blueberry="ssh -i /home/pi/.ssh/gateway-pi -v pi@blueberry-master"' >> /home/pi/.bashrc
+  - echo 'alias strawberry="ssh -i /home/pi/.ssh/gateway-pi -v pi@strawberry-master"' >> /home/pi/.bashrc
+  - echo 'alias blackberry="ssh -i /home/pi/.ssh/gateway-pi -v pi@blackberry-master"' >> /home/pi/.bashrc
+  - echo 'alias raspberry="ssh -i /home/pi/.ssh/gateway-pi -v pi@raspberry-worker"' >> /home/pi/.bashrc
+  - echo 'alias cranberry="ssh -i /home/pi/.ssh/gateway-pi -v pi@cranberry-worker"' >> /home/pi/.bashrc
+  - echo 'alias orange="ssh -i /home/pi/.ssh/gateway-pi -v pi@orange-worker"' >> /home/pi/.bashrc
+  - echo 'alias mandarine="ssh -i /home/pi/.ssh/gateway-pi -v pi@mandarine-worker"' >> /home/pi/.bashrc
+
+## Reboot to enable Wifi configuration (more details in network-config file)
+power_state:
+  mode: reboot
+  message: Rebooting after cloud-init configuration
+  timeout: 30
+  condition: True

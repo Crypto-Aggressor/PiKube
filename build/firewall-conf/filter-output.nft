@@ -1,0 +1,14 @@
+chain output {
+    # Policy: By default, allow all outgoing traffic
+    # The purpose of this is to ensure the machine can freely initiate connections to external resources
+    # without any hindrance.
+    type filter hook output priority 0; policy accept;
+
+    # At this time, there are no specific output filters.
+    # This section serves as a placeholder for any future specific output rules that may be required.
+    # For instance, if in the future there's a need to block specific outgoing traffic or
+    # limit the machine's connections to certain external resources, those rules would be added here.
+
+    # Log NAT prerouting decisions
+    log prefix "[NAT PREROUTING]:" limit rate 5/minute
+}

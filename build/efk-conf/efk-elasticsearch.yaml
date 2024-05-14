@@ -1,0 +1,32 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: efk
+  namespace: logging
+spec:
+  version: 8.1.2
+  nodeSets:
+  - name: default
+    count: 1
+    config:
+      node.store.allow_mmap: false
+    volumeClaimTemplates:
+      - metadata:
+          name: elasticsearch-data
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 5Gi
+          storageClassName: longhorn
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+  auth:
+    roles:
+      - secretName: es-fluentd-roles-secret
+      - secretName: es-prometheus-roles-secret
+    fileRealm:
+      - secretName: es-fluentd-user-file-realm
+      - secretName: es-prometheus-user-file-realm

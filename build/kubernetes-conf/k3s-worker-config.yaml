@@ -1,0 +1,7 @@
+token-file: /etc/rancher/k3s/cluster-token
+node-label:
+  - 'node_type=worker'
+kubelet-arg:
+  - 'config=/etc/rancher/k3s/kubelet.config'
+kube-proxy-arg:
+  - 'metrics-bind-address=0.0.0.0'

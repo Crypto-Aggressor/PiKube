@@ -1,0 +1,39 @@
+# iscsi-multipath-setup.yaml
+---
+- name: Configure iSCSI and Multipath for Longhorn on PiCluster Nodes
+  hosts: picluster
+  become: yes
+  tasks:
+    - name: Install open-iscsi
+      apt:
+        name: open-iscsi
+        state: present
+      notify: restart iscsid
+
+    - name: Remove default iSCSI authentication parameters
+      lineinfile:
+        path: /etc/iscsi/iscsid.conf
+        regexp: '^(node.session.auth.username|node.session.auth.password|discovery.sendtargets.auth.username|discovery.sendtargets.auth.password)'
+        line: '# \1'
+        state: present
+
+    - name: Add Longhorn devices to the multipath blacklist
+      blockinfile:
+        path: /etc/multipath.conf
+        block: |
+          blacklist {
+            devnode "^sd[a-z0-9]+"
+          }
+        marker: "# {mark} ANSIBLE MANAGED BLOCK for Longhorn"
+      notify: restart multipathd
+
+  handlers:
+    - name: restart iscsid
+      systemd:
+        name: iscsid
+        state: restarted
+
+    - name: restart multipathd
+      systemd:
+        name: multipathd
+        state: restarted

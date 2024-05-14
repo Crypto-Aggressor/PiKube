@@ -1,0 +1,37 @@
+gateway-packages-to-install:
+  - name: libraspberrypi-bin
+    description: Raspberry Pi-specific utilities and tools.
+
+  - name: net-tools
+    description: Essential network diagnostic utilities.
+
+  - name: arp-scan
+    description: Detect and identify devices on the network.
+
+  - name: inetutils-traceroute
+    description: Network path analysis using traceroute.
+
+  - name: nftables
+    description: Modern firewall management with nftables.
+
+  - name: linux-modules-extra-raspi
+    description: Additional kernel modules for Raspberry Pi hardware support.
+
+  - name: dnsmasq
+    description: Lightweight DNS, DHCP, and TFTP server.
+
+  - name: iptables-persistent
+    description: Persistent IP packet filter rules for IPv4 and IPv6.
+
+  - name: netfilter-persistent
+    description: Framework for saving and restoring netfilter rules.
+
+  - name: haproxy
+    description: HAProxy load balancer.
+
+  - name: fake-hwclock
+    description: Fake hardware clock.
+          
+  - name: bridge-utils
+    description: Utilities for configuring the Linux Ethernet bridge.
+

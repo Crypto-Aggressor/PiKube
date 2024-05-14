@@ -1,0 +1,91 @@
+# Ingress for Grafana
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-grafana
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    cert-manager.io/common-name: monitoring.picluster.quantfinancehub.com
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.picluster.quantfinancehub.com
+      secretName: monitoring-tls
+  rules:
+    - host: monitoring.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /grafana/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+---
+# Ingress for Prometheus
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-prometheus
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: nginx/basic-auth-secret
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    cert-manager.io/common-name: monitoring.picluster.quantfinancehub.com
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.picluster.quantfinancehub.com
+      secretName: monitoring-tls
+  rules:
+    - host: monitoring.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /prometheus/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-prometheus
+                port:
+                  number: 9090
+---
+# Ingress for AlertManager
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-alertmanager
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    cert-manager.io/common-name: monitoring.picluster.quantfinancehub.com
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.picluster.quantfinancehub.com
+      secretName: monitoring-tls
+  rules:
+    - host: monitoring.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /alertmanager/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-alertmanager
+                port:
+                  number: 9093

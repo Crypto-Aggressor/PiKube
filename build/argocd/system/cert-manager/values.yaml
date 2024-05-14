@@ -1,0 +1,38 @@
+# values.yaml
+# Custom CA issuer configuration
+# Enable private PKI using a custom CA
+# It creates a ClusterIssuer resource `ca-issuer`
+ca:
+  enabled: true
+
+# ACME (Letsencrypt) issuer configuration
+# https://cert-manager.io/docs/configuration/acme/
+acme:
+  acme_issuer_email: admin@quantfinancehub.com
+  dns01:
+    # Disable ionos dns01 solver
+    ionos:
+      enabled: false
+    # Enable Cloudflare dns01 solver
+    # It creates ClusterIssuer resource `letsencrypt-issuer`
+    cloudflare:
+      enabled: true
+      email: quant-finance-hub@outlook.com
+      apiKeySecretRef:
+        name: cloudflare-api-key-secret
+        key: api-token
+
+########################
+# cert-manager  subchart
+########################
+
+# CDRs installed as part of CDR application
+cert-manager:
+  installCRDs: false
+
+# #####################################
+# # cert-manager-webhook-ionos subchart
+# #####################################
+# cert-manager-webhook-ionos:
+#   groupName: acme.quantfinancehub.com
+

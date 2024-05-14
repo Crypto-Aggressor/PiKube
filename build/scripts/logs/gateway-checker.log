@@ -1,0 +1,22 @@
+2023-10-03 22:41:32,953 - info
+2023-10-03 22:41:32,953 - Command executed: Step 1: Attempting SSH connection
+2023-10-03 22:41:47,915 - info
+2023-10-03 22:41:47,915 - Command executed: Command executed: ssh -i C:/Users/amine/.ssh/gateway-pi pi@192.168.8.10 exit
+2023-10-03 22:41:47,915 - info
+2023-10-03 22:41:47,915 - Command executed: Command execution time: 14.96 seconds
+2023-10-03 22:41:47,915 - info
+2023-10-03 22:41:47,915 - Command executed: Step 2: SSH connection successful
+2023-10-03 22:41:47,915 - info
+2023-10-03 22:41:47,915 - Command executed: Total duration of the connection attempt: 14.96 seconds
+2023-10-03 22:41:47,916 - info
+2023-10-03 22:41:47,916 - Command executed: Time taken to establish connection: 14.96 seconds
+2023-10-03 22:41:47,916 - info
+2023-10-03 22:41:47,916 - Command executed: Step 5: Checking internet connectivity.
+2023-10-03 22:41:47,929 - info
+2023-10-03 22:41:47,929 - Command executed: Command executed: ssh -i C:/Users/amine/.ssh/gateway-pi pi@192.168.8.10 ping -c 1 216.239.38.120
+2023-10-03 22:41:48,754 - info
+2023-10-03 22:41:48,754 - Command executed: Time taken for ping: 0.84 seconds
+2023-10-03 22:41:48,754 - info
+2023-10-03 22:41:48,754 - Command executed: Gateway has internet access.
+2023-10-03 22:41:48,754 - info
+2023-10-03 22:41:48,754 - Command executed: Total time taken to check internet connectivity: 15.80 seconds

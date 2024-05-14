@@ -1,0 +1,71 @@
+# Solving the API issue with custom headers for WebSocket support
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: svc-longhorn-headers
+  namespace: longhorn-system
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+# HTTPS Ingress Resource
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: longhorn-ingress
+  namespace: longhorn-system
+  annotations:
+    # Define HTTPS as the entry point
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # Enable TLS
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Reference Middleware for Basic Auth and custom headers
+    traefik.ingress.kubernetes.io/router.middlewares:
+      traefik-basic-auth@kubernetescrd, longhorn-system-svc-longhorn-headers@kubernetescrd
+    # Enable automatic SSL certificate creation and storage in a Secret via cert-manager
+    cert-manager.io/cluster-issuer: picluster-ca-issuer
+    cert-manager.io/common-name: longhorn.picluster.quantfinancehub.com
+spec:
+  tls:
+    - hosts:
+        - longhorn.picluster.quantfinancehub.com
+      secretName: storage-tls
+  rules:
+    - host: longhorn.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80
+
+# HTTP Ingress for HTTP -> HTTPS Redirection
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: longhorn-redirect
+  namespace: longhorn-system
+  annotations:
+    # Use Middleware for redirection
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-redirect@kubernetescrd
+    # Define HTTP as the entrypoint
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: longhorn.picluster.quantfinancehub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80

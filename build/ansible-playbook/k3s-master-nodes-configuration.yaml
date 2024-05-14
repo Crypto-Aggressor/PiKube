@@ -1,0 +1,146 @@
+# k3s-master-nodes-configuration.yaml
+---
+# This playbook configures K3s master nodes and configures kubectl on the gateway.
+# It includes steps to create the necessary configuration directory,
+# set up a shared cluster token for node authentication, 
+# and apply various K3s settings to optimize the cluster's operation and security.
+
+# Setup tasks for K3s on master nodes
+- name: Setup K3s Master Nodes
+  hosts: k3s_master
+  become: true
+  tasks:
+    # Creates the configuration directory for K3s
+    - name: Initialize K3s configuration directory
+      file:
+        path: /etc/rancher/k3s
+        state: directory
+
+    # Sets up a shared cluster token for K3s nodes
+    - name: Setup shared cluster token for K3s nodes
+      copy:
+        content: "secret1"
+        dest: /etc/rancher/k3s/cluster-token
+        mode: '0600'
+
+    # Configures the kubelet based on Kubernetes' requirements
+    - name: Setup Kubelet Configuration for K3s
+      copy:
+        content: |
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          shutdownGracePeriod: 30s
+          shutdownGracePeriodCriticalPods: 10s
+        dest: /etc/rancher/k3s/kubelet.config
+        mode: '0644'
+
+    # Applies the main configuration for K3s including disabling unnecessary services
+    - name: Apply K3s configuration settings
+      copy:
+        content: |
+          token-file: /etc/rancher/k3s/cluster-token
+          disable:
+            - local-storage
+            - servicelb
+            - traefik
+          etcd-expose-metrics: true
+          kube-controller-manager-arg:
+            - bind-address=0.0.0.0
+            - terminated-pod-gc-threshold=10
+          kube-proxy-arg:
+            - metrics-bind-address=0.0.0.0
+          kube-scheduler-arg:
+            - bind-address=0.0.0.0
+          kubelet-arg:
+            - config=/etc/rancher/k3s/kubelet.config
+          node-taint:
+            - node-role.kubernetes.io/master=true:NoSchedule
+          tls-san:
+            - 10.0.0.1
+            - gateway.picluster.homelab.com
+          write-kubeconfig-mode: "644"
+        dest: /etc/rancher/k3s/config.yaml
+        mode: '0644'
+
+# Installs K3s on the primary master node
+- name: Deploy Primary Master Node with K3s
+  hosts: node1
+  become: true
+  tasks:
+    - name: Check if K3s is already installed to avoid reinstallation
+      command: systemctl is-active k3s
+      register: k3s_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install K3s on primary master node if not already installed
+      shell: curl -sfL https://get.k3s.io | sh -s - server --cluster-init
+      when: k3s_status.rc != 0  # Executes if K3s is not active
+      args:
+        creates: /var/lib/rancher/k3s/server/node-token
+
+# Deploys K3s on secondary master nodes by joining them to the cluster
+- name: Deploy Secondary Master Nodes with K3s
+  hosts: k3s_master
+  become: true
+  tasks:
+    - name: Ensure connectivity to the primary master node before proceeding
+      wait_for:
+        host: "{{ hostvars['node1'].ansible_host }}"
+        port: 6443
+        state: started
+        timeout: 300
+      when: inventory_hostname != 'node1'
+
+    - name: Install K3s on secondary master nodes by joining them to the cluster
+      shell: curl -sfL https://get.k3s.io | sh -s - server --server https://gateway.picluster.quantfinancehub.com:6443
+      register: k3s_installation
+      until: k3s_installation.rc == 0
+      retries: 5
+      delay: 60
+      when: inventory_hostname != 'node1'
+      ignore_errors: true
+      args:
+        creates: /var/lib/rancher/k3s/server/node-token
+
+# Transfer the K3s configuration file from the primary master node to the gateway and configure kubectl
+- name: Transfer and configure k3s.yaml on gateway
+  hosts: gateway
+  tasks:
+    - name: Ensure .kube directory exists for storing Kubernetes config
+      file:
+        path: "/home/pi/.kube"
+        state: directory
+        owner: "pi"
+        group: "users"
+        mode: '0755'
+
+    - name: Securely copy the K3s config file from primary master to gateway
+      ansible.builtin.command: >
+        scp -i ~/.ssh/gateway-pi pi@blueberry-master:/etc/rancher/k3s/k3s.yaml /home/pi/.kube/config_temp.yaml
+
+    - name: Update Kubernetes API server address in config file to point to the cluster's external IP
+      ansible.builtin.replace:
+        path: "/home/pi/.kube/config_temp.yaml"
+        regexp: 'server: https://127.0.0.1:6443'
+        replace: 'server: https://10.0.0.1:6443'
+
+    - name: Rename the temporary config file to 'config.yaml'
+      command: mv /home/pi/.kube/config_temp.yaml /home/pi/.kube/config.yaml
+
+    - name: Set appropriate permissions on the new config file
+      file:
+        path: "/home/pi/.kube/config.yaml"
+        owner: "pi"
+        group: "users"
+        mode: '0600'
+
+    - name: Add KUBECONFIG environment variable to .bashrc for persistent kubectl configuration
+      lineinfile:
+        path: "/home/pi/.bashrc"
+        line: "export KUBECONFIG=/home/pi/.kube/config.yaml"
+        create: false
+
+    - name: Reminder to source .bashrc or restart shell for immediate effect
+      debug:
+        msg: "Please run 'source ~/.bashrc' or log out and back in for the KUBECONFIG changes to take effect."

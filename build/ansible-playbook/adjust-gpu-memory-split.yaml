@@ -1,0 +1,96 @@
+# # adjust-gpu-memory-split.yaml
+# ---
+# - name: Update GPU Memory Split for Gateway
+#   hosts: raspberrypi  # Specifies the targeted hosts.
+#   become: yes     # Use elevated privileges (sudo).
+#   vars:
+#     new_value: 16  # Variable used for the desired `gpu_mem` setting.
+  
+#   tasks:
+#     # Fetch the current GPU configuration.
+#     - name: Fetch current configuration from /boot/firmware/config.txt
+#       slurp:
+#         src: /boot/firmware/config.txt
+#       register: current_config_content
+
+#     # Decode and check if the `gpu_mem` setting exists in the config.
+#     - name: Decode configuration content
+#       set_fact:
+#         decoded_config: "{{ current_config_content['content'] | b64decode }}"
+
+#     - name: Check if the GPU Memory Split setting already exists
+#       set_fact:
+#         current_config: "{{ decoded_config | regex_findall('gpu_mem=\\d+') }}"
+#         current_value: "{{ current_config | last | split('=') | last }}"
+#       when: '"gpu_mem=" in decoded_config'
+
+#     # Display the current `gpu_mem` value if it's already set.
+#     - name: Display a message if the GPU Memory Split is already set
+#       debug:
+#         msg: "GPU Memory Split is already set to {{ current_value | default('0') }} MB"
+#       when: current_config is defined and (current_value | default('0') | int) == new_value
+
+#     # Manage the GPU Memory Split setting with a marker block.
+#     - name: Ensure GPU Memory Split setting is managed with a marker block
+#       blockinfile:
+#         path: /boot/firmware/config.txt
+#         block: |
+#           gpu_mem={{ new_value }}
+#         marker: "# {mark} ANSIBLE MANAGED BLOCK: GPU Memory Split"
+#         backup: yes  # Creates a backup of the config file before making changes.
+#       when: current_config is undefined or (current_value | default('0') | int) != new_value
+
+#     # Conditionally reboot the system if the `gpu_mem` setting was updated.
+#     - name: Reboot the system if GPU Memory Split changed
+#       reboot:
+#         msg: "Rebooting due to GPU Memory Split change"
+#         reboot_timeout: 300
+#       when: current_config is undefined or (current_value | default('0') | int) != new_value
+
+# adjust-gpu-memory-split.yaml
+---
+- name: Update GPU Memory Split for Raspberry Pi Nodes
+  hosts: raspberrypi
+  become: yes
+  vars:
+    gpu_mem_value: 16
+
+  tasks:
+    # # Manually create a backup of the config.txt file with a timestamped filename to avoid issues with filesystem constraints
+    # - name: Create a backup of the GPU config
+    #   ansible.builtin.copy:
+    #     src: /boot/firmware/config.txt
+    #     dest: "/boot/firmware/config.txt.backup_{{ lookup('ansible.builtin.date', '%Y%m%d%H%M%S') }}"
+    #     remote_src: yes
+    #   # This backup is created every time the playbook runs, consider adding conditions if needed
+
+    # Check if the desired GPU memory split setting is already present in the config.txt file
+    - name: Check current GPU Memory Split setting
+      command: grep -E "^gpu_mem=" /boot/firmware/config.txt
+      register: gpu_mem_check
+      ignore_errors: true
+      changed_when: false
+
+    # Display the current GPU Memory Split setting if found
+    - name: Display current GPU Memory Split setting
+      debug:
+        msg: "Current GPU Memory Split setting: '{{ gpu_mem_check.stdout }}'"
+      when: gpu_mem_check.rc == 0
+
+    # Update the GPU Memory Split setting using the blockinfile module, without creating an additional backup since it's already done manually
+    - name: Update GPU Memory Split setting
+      blockinfile:
+        path: /boot/firmware/config.txt
+        block: |
+          gpu_mem={{ gpu_mem_value }}
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: GPU Memory Split"
+        backup: no # Backup is handled manually at the beginning of this playbook
+      when: gpu_mem_check.rc != 0 or (gpu_mem_check.rc == 0 and ('gpu_mem=' ~ gpu_mem_value) not in gpu_mem_check.stdout)
+      register: gpu_mem_updated
+
+    # Conditionally reboot the system if the GPU Memory Split setting was updated
+    - name: Reboot the system if GPU Memory Split was updated
+      reboot:
+        msg: "Rebooting due to GPU Memory Split update."
+        reboot_timeout: 300
+      when: gpu_mem_updated.changed
